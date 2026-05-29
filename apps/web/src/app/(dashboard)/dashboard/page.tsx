@@ -16,11 +16,11 @@ export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      const { data } = await api.get('/dashboard/stats')
+      const { data } = await api.get('/reports/dashboard-stats')
       return data.data as {
         todayBookings: number
         revenue: number
-        customers: number
+        totalCustomers: number
         pendingInvoices: number
       }
     },
@@ -37,7 +37,7 @@ export default function DashboardPage() {
   const statCards = [
     { label: "Today's Bookings", value: stats?.todayBookings ?? 0, icon: CalendarCheck, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' },
     { label: 'Revenue', value: stats?.revenue ? formatCurrency(stats.revenue) : '₦0.00', icon: DollarSign, color: 'text-green-600 bg-green-50 dark:bg-green-900/20' },
-    { label: 'Customers', value: stats?.customers ?? 0, icon: Users, color: 'text-purple-600 bg-purple-50 dark:bg-purple-900/20' },
+    { label: 'Customers', value: stats?.totalCustomers ?? 0, icon: Users, color: 'text-purple-600 bg-purple-50 dark:bg-purple-900/20' },
     { label: 'Pending Invoices', value: stats?.pendingInvoices ?? 0, icon: FileText, color: 'text-orange-600 bg-orange-50 dark:bg-orange-900/20' },
   ]
 

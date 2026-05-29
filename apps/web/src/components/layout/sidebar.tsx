@@ -11,11 +11,13 @@ import {
   Wrench,
   Calendar,
   FileText,
+  Bell,
   Settings,
   ChevronLeft,
   ChevronRight,
   LogOut,
   Building2,
+  BarChart3,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
@@ -27,6 +29,8 @@ const navItems = [
   { href: '/services', label: 'Services', icon: Wrench },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/invoices', label: 'Invoices', icon: FileText },
+  { href: '/notifications', label: 'Notifications', icon: Bell },
+  { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 

@@ -5,7 +5,7 @@ import { getStatusColor } from '@/lib/utils'
 const Badge = React.forwardRef<
   HTMLSpanElement,
   React.HTMLAttributes<HTMLSpanElement> & {
-    variant?: 'default' | 'secondary' | 'destructive' | 'outline'
+    variant?: 'default' | 'secondary' | 'destructive' | 'outline' | 'success'
   }
 >(({ className, variant = 'default', ...props }, ref) => {
   return (
@@ -18,6 +18,7 @@ const Badge = React.forwardRef<
           'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300': variant === 'secondary',
           'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400': variant === 'destructive',
           'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300': variant === 'outline',
+          'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': variant === 'success',
         },
         className
       )}

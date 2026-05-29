@@ -105,6 +105,8 @@ model User {
   role          UserRole @default(TECHNICIAN)
   isActive            Boolean    @default(true)
   avatarUrl           String?
+  latitude            Float?
+  longitude           Float?
   lastLoginAt         DateTime?
   resetToken          String?    @unique
   resetTokenExpiresAt DateTime?

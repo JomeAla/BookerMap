@@ -84,7 +84,7 @@ export class BookingService {
     }
     return this.prisma.booking.findMany({
       where,
-      include: { service: true, customer: true, technician: true, dispatch: true },
+      include: { service: true, customer: true, technician: true, dispatch: true, recurrence: true },
       orderBy: { startTime: 'desc' },
     });
   }

@@ -2,9 +2,12 @@
 
 import * as React from 'react'
 import { usePathname } from 'next/navigation'
-import { Bell, ChevronDown, User as UserIcon } from 'lucide-react'
+import { Bell, ChevronDown } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
+import { useQuery } from '@tanstack/react-query'
+import { getUnreadCount } from '@/lib/notifications'
+import { NotificationPanel } from '@/components/notifications/notification-panel'
 
 const breadcrumbMap: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -13,6 +16,8 @@ const breadcrumbMap: Record<string, string> = {
   services: 'Services',
   calendar: 'Calendar',
   invoices: 'Invoices',
+  notifications: 'Notifications',
+  reports: 'Reports',
   settings: 'Settings',
   payments: 'Payments',
   ai: 'AI Agent',
@@ -23,7 +28,15 @@ export function Header() {
   const pathname = usePathname()
   const { user, logout } = useAuth()
   const [dropdownOpen, setDropdownOpen] = React.useState(false)
+  const [notifOpen, setNotifOpen] = React.useState(false)
   const dropdownRef = React.useRef<HTMLDivElement>(null)
+  const notifRef = React.useRef<HTMLDivElement>(null)
+
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ['notifications-unread'],
+    queryFn: getUnreadCount,
+    refetchInterval: 30000,
+  })
 
   const segments = pathname.split('/').filter(Boolean)
   const breadcrumbs = segments.map((seg: string, i: number) => ({
@@ -35,6 +48,9 @@ export function Header() {
     function handleClick(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false)
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClick)
@@ -55,10 +71,20 @@ export function Header() {
       </nav>
 
       <div className="ml-auto flex items-center gap-3">
-        <button className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-          <Bell className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />
-        </button>
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={() => setNotifOpen(!notifOpen)}
+            className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <Bell className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] rounded-full bg-red-500 text-white text-[10px] font-medium flex items-center justify-center px-1">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+          {notifOpen && <NotificationPanel onClose={() => setNotifOpen(false)} />}
+        </div>
 
         <div className="relative" ref={dropdownRef}>
           <button

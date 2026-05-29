@@ -182,6 +182,8 @@ export interface Booking {
   customerId: string
   serviceId: string
   technicianId?: string | null
+  recurrenceId?: string | null
+  recurrence?: RecurringBooking | null
   customer?: Customer
   service?: Service
   technician?: User | null
@@ -309,6 +311,21 @@ export interface AiMessage {
   entities?: any
   createdAt: string
   conversationId: string
+}
+
+export interface Notification {
+  id: string
+  type: NotificationType
+  channel: string
+  recipient: string
+  subject?: string | null
+  body: string
+  sentAt?: string | null
+  readAt?: string | null
+  status: string
+  createdAt: string
+  tenantId: string
+  userId?: string | null
 }
 
 export interface AiResponse {

@@ -10,10 +10,15 @@ import { ServiceModule } from './service/service.module';
 import { TerritoryModule } from './territory/territory.module';
 import { BookingModule } from './booking/booking.module';
 import { DispatchModule } from './dispatch/dispatch.module';
+import { TechnicianModule } from './technician/technician.module';
+import { RoutingModule } from './routing/routing.module';
 import { InvoiceModule } from './invoice/invoice.module';
 import { PaymentModule } from './payment/payment.module';
 import { AiAgentModule } from './ai-agent/ai-agent.module';
 import { NotificationModule } from './notification/notification.module';
+import { ReportsModule } from './reports/reports.module';
+import { RecurringBookingModule } from './recurring-booking/recurring-booking.module';
+import { CouponModule } from './coupon/coupon.module';
 import { WebhookModule } from './webhook/webhook.module';
 import { CommonModule } from './common/common.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -38,6 +43,11 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     AiAgentModule,
     NotificationModule,
     WebhookModule,
+    TechnicianModule,
+    RoutingModule,
+    ReportsModule,
+    RecurringBookingModule,
+    CouponModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: HttpExceptionFilter },

@@ -5,41 +5,62 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { PageLoader } from '@/components/ui/spinner'
-import { formatDate, formatCurrency, getStatusColor } from '@/lib/utils'
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react'
-import {
-  startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  eachDayOfInterval, isSameMonth, isSameDay, isToday, parseISO, format
-} from 'date-fns'
+import { Spinner } from '@/components/ui/spinner'
+import { format, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { MonthView } from '@/components/calendar/month-view'
+import { WeekView } from '@/components/calendar/week-view'
+import { DayView } from '@/components/calendar/day-view'
 import type { Booking } from '@/types'
+
+type ViewMode = 'month' | 'week' | 'day'
 
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = React.useState(new Date())
-  const [view, setView] = React.useState<'month' | 'week' | 'day'>('month')
+  const [view, setView] = React.useState<ViewMode>('month')
 
-  const monthStart = startOfMonth(currentDate)
-  const monthEnd = endOfMonth(currentDate)
-  const calStart = startOfWeek(monthStart)
-  const calEnd = endOfWeek(monthEnd)
-  const days = eachDayOfInterval({ start: calStart, end: calEnd })
+  const { start, end } = React.useMemo(() => {
+    if (view === 'month') {
+      const ms = startOfMonth(currentDate)
+      const me = endOfMonth(currentDate)
+      return { start: startOfWeek(ms), end: endOfWeek(me) }
+    }
+    if (view === 'week') {
+      return { start: startOfWeek(currentDate), end: endOfWeek(currentDate) }
+    }
+    return { start: startOfWeek(currentDate), end: endOfWeek(currentDate) }
+  }, [currentDate, view])
 
   const { data: bookings, isLoading } = useQuery({
-    queryKey: ['calendar-bookings', currentDate.toISOString()],
+    queryKey: ['calendar-bookings', view, start.toISOString(), end.toISOString()],
     queryFn: async () => {
       const { data } = await api.get('/bookings', {
-        params: {
-          startDate: calStart.toISOString(),
-          endDate: calEnd.toISOString(),
-        },
+        params: { dateFrom: start.toISOString(), dateTo: end.toISOString() },
       })
       return data.data as Booking[]
     },
   })
 
-  const getBookingsForDay = (day: Date) => {
-    return bookings?.filter((b) => isSameDay(parseISO(b.startTime), day)) || []
+  const navigatePrev = () => {
+    if (view === 'month') setCurrentDate(subMonths(currentDate, 1))
+    else if (view === 'week') setCurrentDate(subWeeks(currentDate, 1))
+    else setCurrentDate(subDays(currentDate, 1))
+  }
+
+  const navigateNext = () => {
+    if (view === 'month') setCurrentDate(addMonths(currentDate, 1))
+    else if (view === 'week') setCurrentDate(addWeeks(currentDate, 1))
+    else setCurrentDate(addDays(currentDate, 1))
+  }
+
+  const getTitle = () => {
+    if (view === 'month') return format(currentDate, 'MMMM yyyy')
+    if (view === 'week') {
+      const ws = startOfWeek(currentDate)
+      const we = endOfWeek(currentDate)
+      return `${format(ws, 'MMM d')} - ${format(we, 'MMM d, yyyy')}`
+    }
+    return format(currentDate, 'EEEE, MMMM d, yyyy')
   }
 
   return (
@@ -71,11 +92,11 @@ export default function CalendarPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="icon" onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}>
+            <Button variant="outline" size="icon" onClick={navigatePrev}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <CardTitle className="text-base">{format(currentDate, 'MMMM yyyy')}</CardTitle>
-            <Button variant="outline" size="icon" onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}>
+            <CardTitle className="text-base">{getTitle()}</CardTitle>
+            <Button variant="outline" size="icon" onClick={navigateNext}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -84,46 +105,15 @@ export default function CalendarPage() {
           </Button>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <div key={day} className="p-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 last:border-r-0">
-                {day}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">
-            {days.map((day: Date, idx: number) => {
-              const dayBookings = getBookingsForDay(day)
-              return (
-                <div
-                  key={idx}
-                  className={`min-h-[100px] p-1.5 border-r border-b border-gray-200 dark:border-gray-700 last:border-r-0 ${
-                    !isSameMonth(day, currentDate) ? 'bg-gray-50 dark:bg-gray-800/50' : ''
-                  }`}
-                >
-                  <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${
-                    isToday(day) ? 'bg-blue-600 text-white' : 'text-gray-600 dark:text-gray-400'
-                  }`}>
-                    {format(day, 'd')}
-                  </div>
-                  <div className="space-y-0.5">
-                    {dayBookings.slice(0, 3).map((booking) => (
-                      <div
-                        key={booking.id}
-                        className={`text-xs px-1.5 py-0.5 rounded truncate cursor-pointer ${getStatusColor(booking.status)}`}
-                        title={`${booking.service?.name} - ${formatDate(booking.startTime, 'h:mm a')}`}
-                      >
-                        {format(booking.startTime, 'h:mm a')} {booking.service?.name}
-                      </div>
-                    ))}
-                    {dayBookings.length > 3 && (
-                      <div className="text-xs text-gray-500 px-1">+{dayBookings.length - 3} more</div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          {isLoading ? (
+            <div className="flex justify-center py-12"><Spinner /></div>
+          ) : view === 'month' ? (
+            <MonthView currentDate={currentDate} bookings={bookings || []} onDateChange={(d) => { setCurrentDate(d); setView('day') }} />
+          ) : view === 'week' ? (
+            <WeekView currentDate={currentDate} bookings={bookings || []} />
+          ) : (
+            <DayView currentDate={currentDate} bookings={bookings || []} />
+          )}
         </CardContent>
       </Card>
     </div>

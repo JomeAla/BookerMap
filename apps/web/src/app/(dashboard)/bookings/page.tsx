@@ -13,6 +13,7 @@ import { StatusBadge } from '@/components/ui/badge'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { CalendarCheck, Search, Filter } from 'lucide-react'
+import { RotateCcw } from 'lucide-react'
 import type { Booking, BookingStatus } from '@/types'
 
 const statusOptions = [
@@ -53,9 +54,14 @@ export default function BookingsPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Bookings</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage all bookings</p>
         </div>
-        <Link href="/bookings/new">
-          <Button><CalendarCheck className="h-4 w-4 mr-2" /> New Booking</Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/bookings/recurring">
+            <Button variant="outline"><RotateCcw className="h-4 w-4 mr-2" /> Recurring</Button>
+          </Link>
+          <Link href="/bookings/new">
+            <Button><CalendarCheck className="h-4 w-4 mr-2" /> New Booking</Button>
+          </Link>
+        </div>
       </div>
 
       <Card>
@@ -120,9 +126,16 @@ export default function BookingsPage() {
                       <TableCell className="text-sm">{formatDate(booking.startTime, 'MMM d, yyyy h:mm a')}</TableCell>
                       <TableCell>{formatCurrency(booking.totalPrice)}</TableCell>
                       <TableCell className="text-sm text-gray-500">
-                        {booking.technician ? `${booking.technician.firstName} ${booking.technician.lastName}` : '—'}
+                        {booking.technician ? `${booking.technician.firstName} ${booking.technician.lastName}` : '\u2014'}
                       </TableCell>
-                      <TableCell><StatusBadge status={booking.status} /></TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <StatusBadge status={booking.status} />
+                          {booking.recurrenceId && (
+                            <RotateCcw className="h-3.5 w-3.5 text-blue-500" title="Recurring" />
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Link href={`/bookings/${booking.id}`}>
                           <Button variant="ghost" size="sm">View</Button>
