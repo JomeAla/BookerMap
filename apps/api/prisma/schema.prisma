@@ -1,0 +1,511 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  OWNER
+  MANAGER
+  TECHNICIAN
+  CUSTOMER
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  PAYSTACK
+  FLUTTERWAVE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum NotificationType {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum JobStatus {
+  ASSIGNED
+  EN_ROUTE
+  STARTED
+  COMPLETED
+  CANCELLED
+}
+
+model Tenant {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  domain        String?
+  logo          String?
+  primaryColor  String   @default("#3B82F6")
+  timezone      String   @default("Africa/Lagos")
+  currency      String   @default("NGN")
+  trialEndsAt   DateTime?
+  aiSettings    Json?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  users              User[]
+  customers          Customer[]
+  services           Service[]
+  territories        Territory[]
+  bookings           Booking[]
+  invoices           Invoice[]
+  notifications      Notification[]
+  webhooks           Webhook[]
+  aiResponses        AiResponse[]
+  aiConversations    AiConversation[]
+  paymentSettings    PaymentSettings[]
+  coupons            Coupon[]
+  serviceCategories  ServiceCategory[]
+  recurringBookings  RecurringBooking[]
+
+  @@map("tenants")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  phone         String?
+  role          UserRole @default(TECHNICIAN)
+  isActive            Boolean    @default(true)
+  avatarUrl           String?
+  lastLoginAt         DateTime?
+  resetToken          String?    @unique
+  resetTokenExpiresAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  assignedBookings Booking[]  @relation("AssignedTechnician")
+  jobAssignments   Dispatch[] @relation("AssignedUser")
+  refreshTokens    RefreshToken[]
+  notifications    Notification[]
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+model Customer {
+  id            String   @id @default(cuid())
+  email         String?
+  firstName     String
+  lastName      String
+  phone         String
+  notes         String?
+  tags          String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  addresses CustomerAddress[]
+  bookings  Booking[]
+  invoices  Invoice[]
+
+  @@unique([tenantId, phone])
+  @@map("customers")
+}
+
+model CustomerAddress {
+  id        String  @id @default(cuid())
+  label     String  @default("Home")
+  street    String
+  city      String
+  state     String
+  zipCode   String?
+  latitude  Float?
+  longitude Float?
+  isDefault Boolean @default(false)
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_addresses")
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  duration    Int
+  price       Float
+  priceType   String   @default("flat")
+  isActive    Boolean  @default(true)
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenantId    String
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  categoryId  String?
+  category    ServiceCategory? @relation(fields: [categoryId], references: [id])
+
+  modifiers    ServiceModifier[]
+  intakeFields IntakeField[]
+  bookings     Booking[]
+  territoryServices TerritoryService[]
+
+  @@map("services")
+}
+
+model ServiceCategory {
+  id        String   @id @default(cuid())
+  name      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  services Service[]
+
+  @@map("service_categories")
+}
+
+model ServiceModifier {
+  id        String  @id @default(cuid())
+  name      String
+  price     Float
+  isRequired Boolean @default(false)
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("service_modifiers")
+}
+
+model IntakeField {
+  id        String  @id @default(cuid())
+  label     String
+  type      String  @default("text")
+  required  Boolean @default(false)
+  options   String?
+  sortOrder Int     @default(0)
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("intake_fields")
+}
+
+model Territory {
+  id          String   @id @default(cuid())
+  name        String
+  boundaries  Json?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  territoryServices TerritoryService[]
+
+  @@map("territories")
+}
+
+model TerritoryService {
+  territoryId String
+  territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  serviceId   String
+  service     Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  price       Float?
+  availability Json?
+
+  @@id([territoryId, serviceId])
+  @@map("territory_services")
+}
+
+model Booking {
+  id            String        @id @default(cuid())
+  startTime     DateTime
+  endTime       DateTime
+  status        BookingStatus @default(PENDING)
+  notes         String?
+  intakeAnswers Json?
+  totalPrice    Float
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId   String
+  customer     Customer  @relation(fields: [customerId], references: [id])
+  serviceId    String
+  service      Service   @relation(fields: [serviceId], references: [id])
+  technicianId String?
+  technician   User?     @relation("AssignedTechnician", fields: [technicianId], references: [id])
+
+  invoices     Invoice[]
+  dispatch     Dispatch?
+  recurrenceId String?
+  recurrence   RecurringBooking? @relation(fields: [recurrenceId], references: [id])
+
+  @@map("bookings")
+}
+
+model RecurringBooking {
+  id        String   @id @default(cuid())
+  frequency String   @default("weekly")
+  interval  Int      @default(1)
+  dayOfWeek Int?
+  dayOfMonth Int?
+  startDate DateTime
+  endDate   DateTime?
+  discount  Float    @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  bookings Booking[]
+
+  @@map("recurring_bookings")
+}
+
+model Dispatch {
+  id        String    @id @default(cuid())
+  status    JobStatus @default(ASSIGNED)
+  startedAt DateTime?
+  completedAt DateTime?
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  bookingId     String @unique
+  booking       Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  assignedToId  String
+  assignedTo    User   @relation("AssignedUser", fields: [assignedToId], references: [id])
+
+  @@map("dispatches")
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  invoiceNumber String       @unique
+  status      InvoiceStatus @default(DRAFT)
+  subtotal    Float
+  tax         Float         @default(0)
+  taxRate     Float         @default(0)
+  discount    Float         @default(0)
+  total       Float
+  dueDate     DateTime
+  paidAt      DateTime?
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  bookingId  String?
+  booking    Booking? @relation(fields: [bookingId], references: [id])
+
+  lineItems  InvoiceLineItem[]
+  payments   Payment[]
+
+  @@map("invoices")
+}
+
+model InvoiceLineItem {
+  id          String  @id @default(cuid())
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Float
+  total       Float
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_line_items")
+}
+
+model Payment {
+  id              String          @id @default(cuid())
+  amount          Float
+  currency        String          @default("NGN")
+  status          PaymentStatus   @default(PENDING)
+  provider        PaymentProvider
+  providerRef     String?
+  providerData    Json?
+  fee             Float?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@map("payments")
+}
+
+model PaymentSettings {
+  id              String          @id @default(cuid())
+  provider        PaymentProvider
+  publicKey       String
+  secretKey       String          @unique
+  encryptionKey   String?
+  webhookSecret   String?
+  isLive          Boolean         @default(false)
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider])
+  @@map("payment_settings")
+}
+
+model Coupon {
+  id          String   @id @default(cuid())
+  code        String
+  type        String   @default("percentage")
+  value       Float
+  maxUses     Int?
+  usedCount   Int      @default(0)
+  minAmount   Float?
+  expiresAt   DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@map("coupons")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  channel   String
+  recipient String
+  subject   String?
+  body      String
+  sentAt    DateTime?
+  readAt    DateTime?
+  status    String           @default("PENDING")
+  createdAt DateTime         @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId   String?
+  user     User?  @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+model Webhook {
+  id             String   @id @default(cuid())
+  url            String
+  events         String[]
+  secret         String?
+  isActive       Boolean  @default(true)
+  lastTriggeredAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("webhooks")
+}
+
+model AiConversation {
+  id        String   @id @default(cuid())
+  sessionId String
+  status    String   @default("ACTIVE")
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  messages AiMessage[]
+
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id        String   @id @default(cuid())
+  role      String
+  content   String
+  intent    String?
+  entities  Json?
+  createdAt DateTime @default(now())
+
+  conversationId String
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("ai_messages")
+}
+
+model AiResponse {
+  id        String   @id @default(cuid())
+  trigger   String
+  response  String
+  language  String   @default("en")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("ai_responses")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}

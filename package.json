@@ -1,0 +1,15 @@
+{
+  "name": "bookermap",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BookerMap - Multi-tenant booking and scheduling platform",
+  "scripts": {
+    "dev:api": "cd apps/api && npm run start:dev",
+    "dev:web": "cd apps/web && npm run dev",
+    "build:api": "cd apps/api && npm run build",
+    "build:web": "cd apps/web && npm run build",
+    "prisma:generate": "cd apps/api && npx prisma generate",
+    "prisma:migrate": "cd apps/api && npx prisma migrate dev",
+    "prisma:push": "cd apps/api && npx prisma db push"
+  }
+}
