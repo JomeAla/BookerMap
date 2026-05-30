@@ -110,10 +110,10 @@
 - [x] Intake form handling
 - [x] Booking confirmation
 - [x] Booking modification/cancellation
-- [~] Recurring booking setup — Prisma model exists, no frontend
+- [x] Recurring booking setup — list + create with frequency/interval/discount
 
 ### 3.4 Scheduling Engine
-- [~] Calendar view (day, week, month) — month view works, week/day need proper views
+- [x] Calendar view (day, week, month) — month grid, week timeline, day vertical
 - [x] Time slot generation (30-min intervals, 8am-5pm)
 - [x] Buffer time between jobs
 - [ ] Drive-time calculation — not started
@@ -126,7 +126,7 @@
 - [ ] Job offer system (techs claim jobs) — not started
 - [x] Job status tracking (assigned, en-route, started, completed)
 - [x] Technician job view
-- [ ] Route optimization — not started
+  - [x] Route optimization — dispatches list + route optimization panel consuming POST /routing/optimize
 - [ ] Real-time location tracking — optional
 
 ---
@@ -176,7 +176,7 @@
 - [x] Flutterwave API key input (public key, secret key, encryption key)
 - [x] API key validation (test connection button)
 - [x] Secure credential storage (AES-256-GCM encrypted in DB)
-- [~] Save buttons wired to correct endpoints — currently only toggle active, full save not implemented
+- [x] Save buttons wired to correct endpoints — Paystack/Flutterwave save, test, toggle all functional
 
 ---
 
@@ -188,7 +188,7 @@
 - [x] Invoice emails
 - [x] Feedback request emails
 - [x] Password reset emails
-- [~] Reminder emails — EmailService exists, not wired to cron schedule
+- [x] Reminder emails — ReminderCronService runs hourly via @nestjs/schedule
 - [ ] Team notifications — not started
 
 ### 5.2 SMS Notifications
@@ -201,7 +201,7 @@
 
 ### 5.3 Push Notifications
 - [ ] Push notification setup — not started
-- [ ] In-app notifications — NotificationService creates records, no UI
+- [x] In-app notifications — NotificationPanel dropdown + /notifications page with filter/pagination
 - [ ] Browser push notifications — not started
 - [ ] Mobile push notifications — not started
 
@@ -218,10 +218,10 @@
 
 ### 6.2 AI Chat Interface
 - [x] Chat backend API (POST /ai/chat)
-- [ ] Chat widget UI on customer-facing pages — not started
+- [x] Chat widget UI on customer-facing pages — floating chat on /booking/[tenantSlug] and /portal
 - [ ] Chat history viewer — not started
-- [ ] Typing indicators — not started
-- [ ] Quick reply buttons — not started
+- [x] Typing indicators — spinner while AI responds
+- [x] Quick reply buttons — rendered after assistant messages
 
 ### 6.3 AI Task Execution
 - [x] Booking creation via chat (looks up service, creates customer)
@@ -263,7 +263,7 @@
 - [x] Invoice management (list + create + detail)
 - [x] Settings & branding (general, team, AI, payments)
 - [x] Settings sub-navigation tabs
-- [ ] Reports & analytics — not started
+- [x] Reports & analytics — revenue, booking trends, technician performance, top services
 
 ### 7.3 Technician App (Mobile Web)
 - [x] Job list view (today's jobs)
@@ -288,16 +288,16 @@
 
 ## Remaining Tasks
 
-- [~] **Route optimization** — integrate OSRM or Google Maps to auto-optimize technician routes
-- [~] **SMS/email reminders** — wire up background cron job to send booking reminders 24h before
-- [~] **Reports page** — revenue reports, booking trends, technician performance, top services
-- [~] **Recurring bookings UI** — model exists, build frontend for weekly/monthly schedules
-- [~] **Coupon/promo codes UI** — model exists, build admin CRUD + checkout validation
-- [~] **Payment settings save** — wire save buttons to correct API endpoints
-- [~] **Test suite** — unit tests for critical services (auth, booking, invoice)
-- [~] **Calendar week/day views** — proper day/week layouts (currently re-use month data)
+- [x] **Route optimization** — dispatches list page with checkboxes + Optimize Route button via POST /routing/optimize
+- [x] **SMS/email reminders** — ReminderCronService runs hourly, sends 24h-before reminders via EmailService + SmsService with dedup
+- [x] **Reports page** — revenue reports, booking trends, technician performance, top services
+- [x] **Recurring bookings UI** — list page + create form with frequency/interval/discount
+- [x] **Coupon/promo codes UI** — admin CRUD + checkout validation with discount application
+- [x] **Payment settings save** — Paystack/Flutterwave save, test, toggle all functional
+- [x] **Test suite** — 43 unit tests across auth (10), booking (17), invoice (16) all passing
+- [x] **Calendar week/day views** — proper day/week layouts with time-slot positioning
 - [ ] **Customer mobile app** — React Native app for booking + tracking
-- [ ] **Google Calendar / iCal sync** — two-way calendar sync for technicians
+- [x] **Google Calendar sync** — one-way sync (booking → Google Calendar) via OAuth 2.0, with connect/disconnect/sync in settings UI
 - [ ] **Review & rating system** — post-service feedback collection + public display
 - [ ] **Multi-location per tenant** — single business manages multiple branches
 - [ ] **Inventory management** — track materials/products used per job
@@ -309,12 +309,12 @@
 - [ ] **Technician availability settings**
 - [ ] **Service images upload**
 - [ ] **Embedded booking widget** (script tag for any website)
-- [ ] **Chat widget UI** on customer-facing pages
+- [x] **Chat widget UI** on customer-facing pages
 - [ ] **Customer tags and groups**
 - [ ] **Import/export customers**
-- [ ] **Invoice PDF generation**
+- [x] **Invoice PDF generation**
 - [ ] **Webhook management UI** in admin panel
-- [ ] **In-app notification viewer**
+- [x] **In-app notification viewer**
 - [ ] **Team notifications**
 - [ ] **Saved cards (tokenization)** for Paystack
 - [ ] **Subscription management** (tenant billing)
@@ -357,7 +357,7 @@
 | AI Agent | 9 | ✅ chat, conversations, settings, responses, analytics |
 | **Total** | **94 endpoints** | |
 
-### Frontend (22 pages across 20 routes)
+### Frontend (24 pages across 22 routes)
 | Route | Page | Status |
 |-------|------|--------|
 | `/` | Landing page | ✅ |
@@ -374,14 +374,16 @@
 | `/customers/[id]` | Customer detail | ✅ |
 | `/invoices` | Invoices list | ✅ |
 | `/invoices/[id]` | Invoice detail | ✅ |
+| `/notifications` | Notification list | ✅ |
 | `/services` | Services catalog | ✅ |
 | `/settings` | General settings | ✅ |
 | `/settings/team` | Team management | ✅ |
 | `/settings/ai` | AI agent settings | ✅ |
-| `/settings/payments` | Payment settings | ⏳ save not fully wired |
+| `/settings/payments` | Payment settings | ✅ |
 | `/portal` | Customer portal | ✅ |
 | `/technician` | Technician app | ✅ |
 | `/booking/[tenantSlug]` | Public booking widget | ✅ |
+| `/dispatches` | Dispatches list + route optimization | ✅ |
 
 ---
 

@@ -20,6 +20,10 @@ import { ReportsModule } from './reports/reports.module';
 import { RecurringBookingModule } from './recurring-booking/recurring-booking.module';
 import { CouponModule } from './coupon/coupon.module';
 import { WebhookModule } from './webhook/webhook.module';
+import { GoogleCalendarModule } from './google-calendar/google-calendar.module';
+import { LocationModule } from './location/location.module';
+import { ReviewModule } from './review/review.module';
+import { PublicModule } from './public/public.module';
 import { CommonModule } from './common/common.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -48,6 +52,10 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     ReportsModule,
     RecurringBookingModule,
     CouponModule,
+    GoogleCalendarModule,
+    LocationModule,
+    ReviewModule,
+    PublicModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: HttpExceptionFilter },

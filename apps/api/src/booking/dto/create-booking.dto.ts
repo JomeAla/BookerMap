@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsDateString, IsObject } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsDateString, IsObject, IsNumber, Min } from 'class-validator';
 
 export class CreateBookingDto {
   @IsString()
@@ -16,6 +16,10 @@ export class CreateBookingDto {
 
   @IsOptional()
   @IsString()
+  locationId?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 
   @IsOptional()
@@ -26,4 +30,13 @@ export class CreateBookingDto {
   @IsArray()
   @IsString({ each: true })
   selectedModifiers?: string[];
+
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  couponDiscount?: number;
 }

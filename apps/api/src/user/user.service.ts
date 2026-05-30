@@ -8,6 +8,8 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateAvailabilityDto } from './dto/update-availability.dto';
+import { UpdateSkillsDto } from './dto/update-skills.dto';
 
 @Injectable()
 export class UserService {
@@ -45,6 +47,8 @@ export class UserService {
         isActive: true,
         createdAt: true,
         updatedAt: true,
+        availability: true,
+        skills: true,
       },
     });
   }
@@ -63,6 +67,8 @@ export class UserService {
         isActive: true,
         createdAt: true,
         updatedAt: true,
+        availability: true,
+        skills: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -82,6 +88,8 @@ export class UserService {
         isActive: true,
         createdAt: true,
         updatedAt: true,
+        availability: true,
+        skills: true,
       },
     });
 
@@ -116,8 +124,58 @@ export class UserService {
         isActive: true,
         createdAt: true,
         updatedAt: true,
+        availability: true,
+        skills: true,
       },
     });
+  }
+
+  async getAvailability(tenantId: string, id: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, tenantId },
+      select: { availability: true },
+    });
+    if (!user) throw new NotFoundException(`User with id "${id}" not found`);
+    return user.availability;
+  }
+
+  async updateAvailability(tenantId: string, id: string, dto: UpdateAvailabilityDto) {
+    await this.findById(tenantId, id);
+    return this.prisma.user.update({
+      where: { id },
+      data: { availability: dto.availability },
+      select: { availability: true },
+    });
+  }
+
+  async getSkills(tenantId: string, id: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, tenantId },
+      select: { skills: true },
+    });
+    if (!user) throw new NotFoundException(`User with id "${id}" not found`);
+    return user.skills;
+  }
+
+  async updateSkills(tenantId: string, id: string, dto: UpdateSkillsDto) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, tenantId, role: 'TECHNICIAN' },
+    });
+    if (!user) throw new NotFoundException(`Technician with id "${id}" not found`);
+    return this.prisma.user.update({
+      where: { id },
+      data: { skills: dto.skills },
+      select: { skills: true },
+    });
+  }
+
+  async getAllSkills(tenantId: string): Promise<string[]> {
+    const users = await this.prisma.user.findMany({
+      where: { tenantId, role: 'TECHNICIAN' },
+      select: { skills: true },
+    });
+    const allSkills = users.flatMap((u) => (u.skills as string[]) || []);
+    return [...new Set(allSkills)].sort();
   }
 
   async remove(tenantId: string, id: string) {

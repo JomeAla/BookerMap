@@ -7,6 +7,7 @@ import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { ServiceService } from './service.service';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
+import { UpdateServiceImageDto } from './dto/update-service-image.dto';
 
 @Controller('services')
 @UseGuards(JwtAuthGuard)
@@ -33,10 +34,20 @@ export class ServiceController {
     return this.serviceService.update(tenantId, id, dto);
   }
 
+  @Patch(':id/image')
+  updateImage(@TenantId() tenantId: string, @Param('id') id: string, @Body() dto: UpdateServiceImageDto) {
+    return this.serviceService.updateImage(tenantId, id, dto.imageUrl);
+  }
+
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@TenantId() tenantId: string, @Param('id') id: string) {
     return this.serviceService.remove(tenantId, id);
+  }
+
+  @Get('skills')
+  getSkills(@TenantId() tenantId: string) {
+    return this.serviceService.getAllSkills(tenantId);
   }
 
   @Get('categories/all')

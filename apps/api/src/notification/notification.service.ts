@@ -125,6 +125,13 @@ export class NotificationService {
     };
   }
 
+  async sendTeamNotification(tenantId: string, userIds: string[], title: string, body: string) {
+    for (const userId of userIds) {
+      await this.sendInApp(tenantId, userId, title, body);
+    }
+    return { sent: userIds.length };
+  }
+
   async getUnreadCount(userId: string, tenantId: string) {
     const count = await this.prisma.notification.count({
       where: {

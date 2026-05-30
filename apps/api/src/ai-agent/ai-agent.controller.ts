@@ -1,16 +1,18 @@
-import { Controller, Post, Get, Put, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Put, Body, Param, Query, Req, UseGuards, NotFoundException } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ChatService } from './services/chat.service';
 import { AnalyticsService } from './services/analytics.service';
 import { ChatMessageDto, CreateResponseDto } from './dto/chat-message.dto';
 import { AiSettingsDto } from './dto/ai-settings.dto';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('ai')
 export class AiAgentController {
   constructor(
     private readonly chatService: ChatService,
     private readonly analyticsService: AnalyticsService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post('chat')
@@ -18,7 +20,13 @@ export class AiAgentController {
     @Body() dto: ChatMessageDto,
     @Req() req: any,
   ) {
-    const tenantId = this.getTenantId(req);
+    let tenantId = this.getTenantId(req);
+    if (dto.tenantSlug) {
+      const tenant = await this.prisma.tenant.findUnique({ where: { slug: dto.tenantSlug } });
+      if (tenant) {
+        tenantId = tenant.id;
+      }
+    }
     return this.chatService.processMessage(
       dto.message,
       tenantId,

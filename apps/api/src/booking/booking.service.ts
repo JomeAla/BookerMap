@@ -16,7 +16,7 @@ export class BookingService {
   ) {}
 
   async create(tenantId: string, dto: CreateBookingDto) {
-    const { serviceId, customerId, startTime, technicianId, notes, intakeAnswers, selectedModifiers } = dto;
+    const { serviceId, customerId, startTime, technicianId, locationId, notes, intakeAnswers, selectedModifiers, couponCode, couponDiscount } = dto;
 
     const service = await this.prisma.service.findFirst({
       where: { id: serviceId, tenantId },
@@ -43,12 +43,34 @@ export class BookingService {
       totalPrice += selected.reduce((sum, m) => sum + m.price, 0);
     }
 
+    if (couponCode) {
+      const coupon = await this.prisma.coupon.findUnique({
+        where: { tenantId_code: { tenantId, code: couponCode.toUpperCase() } },
+      });
+      if (!coupon) throw new BadRequestException('Invalid coupon code');
+      if (!coupon.isActive) throw new BadRequestException('Coupon is no longer active');
+      if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) throw new BadRequestException('Coupon has expired');
+      if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) throw new BadRequestException('Coupon usage limit reached');
+      if (coupon.minAmount && totalPrice < coupon.minAmount) throw new BadRequestException(`Minimum amount of ${coupon.minAmount} required`);
+
+      const discount = couponDiscount ?? (coupon.type === 'percentage'
+        ? totalPrice * (coupon.value / 100)
+        : coupon.value);
+      totalPrice = Math.max(0, totalPrice - Math.min(discount, totalPrice));
+
+      await this.prisma.coupon.update({
+        where: { id: coupon.id },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
+
     const booking = await this.prisma.booking.create({
       data: {
         tenantId,
         serviceId,
         customerId,
         technicianId: technicianId || null,
+        locationId: locationId || null,
         startTime: start,
         endTime: end,
         notes,
@@ -56,7 +78,7 @@ export class BookingService {
         totalPrice,
         status: 'PENDING',
       },
-      include: { service: true, customer: true, technician: true },
+      include: { service: true, customer: true, technician: true, location: true },
     });
 
     this.webhookService.dispatchEvent(tenantId, 'booking.created', { bookingId: booking.id, status: booking.status })
@@ -84,7 +106,7 @@ export class BookingService {
     }
     return this.prisma.booking.findMany({
       where,
-      include: { service: true, customer: true, technician: true, dispatch: true, recurrence: true },
+      include: { service: true, customer: true, technician: true, location: true, dispatch: true, recurrence: true },
       orderBy: { startTime: 'desc' },
     });
   }
@@ -96,6 +118,7 @@ export class BookingService {
         service: { include: { modifiers: true } },
         customer: true,
         technician: true,
+        location: true,
         dispatch: true,
         invoices: { include: { lineItems: true } },
       },

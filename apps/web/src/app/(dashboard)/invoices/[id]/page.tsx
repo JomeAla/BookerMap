@@ -12,7 +12,7 @@ import { StatusBadge } from '@/components/ui/badge'
 import { PageLoader } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowLeft, User, Mail, Calendar, DollarSign, FileText, Send, CheckCircle, Ban } from 'lucide-react'
+import { ArrowLeft, User, Mail, Calendar, DollarSign, FileText, Send, CheckCircle, Ban, Download } from 'lucide-react'
 import type { Invoice } from '@/types'
 
 export default function InvoiceDetailPage() {
@@ -121,6 +121,11 @@ export default function InvoiceDetailPage() {
                 <CheckCircle className="h-4 w-4 mr-2" /> Mark as Paid
               </Button>
             )}
+            <a href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/invoices/${id}/pdf`} target="_blank" className="block">
+              <Button className="w-full" size="sm" variant="outline">
+                <Download className="h-4 w-4 mr-2" /> Download PDF
+              </Button>
+            </a>
             {invoice.booking && (
               <Link href={`/bookings/${invoice.booking.id}`}>
                 <Button className="w-full" size="sm" variant="outline">

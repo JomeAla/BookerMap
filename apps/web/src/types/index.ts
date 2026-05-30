@@ -76,6 +76,8 @@ export interface User {
   phone?: string | null
   role: UserRole
   isActive: boolean
+  availability?: Record<string, Array<{ start: string; end: string }>> | null
+  skills?: string[] | null
   avatarUrl?: string | null
   lastLoginAt?: string | null
   createdAt: string
@@ -90,7 +92,7 @@ export interface Customer {
   lastName: string
   phone: string
   notes?: string | null
-  tags?: string | null
+  tags?: string[]
   createdAt: string
   updatedAt: string
   tenantId: string
@@ -179,6 +181,7 @@ export interface Booking {
   createdAt: string
   updatedAt: string
   tenantId: string
+  locationId?: string | null
   customerId: string
   serviceId: string
   technicianId?: string | null
@@ -187,6 +190,7 @@ export interface Booking {
   customer?: Customer
   service?: Service
   technician?: User | null
+  location?: Location | null
   invoices?: Invoice[]
   dispatch?: Dispatch | null
 }
@@ -326,6 +330,53 @@ export interface Notification {
   createdAt: string
   tenantId: string
   userId?: string | null
+}
+
+export interface Webhook {
+  id: string
+  url: string
+  events: string[]
+  secret: string | null
+  isActive: boolean
+  lastTriggeredAt: string | null
+  createdAt: string
+  updatedAt: string
+  tenantId: string
+}
+
+export interface Location {
+  id: string
+  name: string
+  address?: string | null
+  phone?: string | null
+  email?: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  tenantId: string
+}
+
+export enum ReviewStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
+
+export interface Review {
+  id: string
+  rating: number
+  comment?: string | null
+  adminReply?: string | null
+  status: ReviewStatus
+  createdAt: string
+  updatedAt: string
+  tenantId: string
+  bookingId: string
+  customerId: string
+  technicianId?: string | null
+  booking?: Booking & { service?: Service; customer?: Customer; technician?: User }
+  customer?: Customer
+  technician?: User
 }
 
 export interface AiResponse {

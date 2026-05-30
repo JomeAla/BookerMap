@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Put,
   Delete,
   Param,
   Body,
@@ -11,6 +12,8 @@ import {
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateAvailabilityDto } from './dto/update-availability.dto';
+import { UpdateSkillsDto } from './dto/update-skills.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -52,5 +55,33 @@ export class UserController {
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   remove(@CurrentUser() user: any, @Param('id') id: string) {
     return this.userService.remove(user.tenantId, id);
+  }
+
+  @Get(':id/availability')
+  getAvailability(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.userService.getAvailability(user.tenantId, id);
+  }
+
+  @Put(':id/availability')
+  updateAvailability(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateAvailabilityDto,
+  ) {
+    return this.userService.updateAvailability(user.tenantId, id, dto);
+  }
+
+  @Get(':id/skills')
+  getSkills(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.userService.getSkills(user.tenantId, id);
+  }
+
+  @Put(':id/skills')
+  updateSkills(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateSkillsDto,
+  ) {
+    return this.userService.updateSkills(user.tenantId, id, dto);
   }
 }

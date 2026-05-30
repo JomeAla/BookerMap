@@ -15,10 +15,12 @@ export class SchedulingService {
       where: { tenantId, role: 'TECHNICIAN', isActive: true },
     });
 
-    const dayStart = new Date(date);
-    dayStart.setHours(8, 0, 0, 0);
-    const dayEnd = new Date(date);
-    dayEnd.setHours(17, 0, 0, 0);
+    const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    const availabilityDefault: Array<{ start: string; end: string }> = [{ start: '08:00', end: '17:00' }];
+
+    const slotDuration = service.duration * 60 * 1000;
+    const intervalMs = 30 * 60 * 1000;
+    const bufferMs = 30 * 60 * 1000;
 
     const slots: Array<{
       technicianId: string;
@@ -28,39 +30,49 @@ export class SchedulingService {
     }> = [];
 
     for (const tech of technicians) {
-      const bookings = await this.prisma.booking.findMany({
-        where: {
-          technicianId: tech.id,
-          startTime: { gte: dayStart },
-          endTime: { lte: new Date(dayEnd.getTime() + 86400000) },
-          status: { notIn: ['CANCELLED', 'NO_SHOW'] as any },
-        },
-        orderBy: { startTime: 'asc' },
-      });
+      const techAvail: Record<string, Array<{ start: string; end: string }>> | null = (tech as any).availability;
+      const dayBlocks = techAvail?.[dayOfWeek] || availabilityDefault;
 
-      const slotDuration = service.duration * 60 * 1000;
-      const intervalMs = 30 * 60 * 1000;
-      const bufferMs = 30 * 60 * 1000;
-      let currentTime = new Date(dayStart);
+      for (const block of dayBlocks) {
+        const [startH, startM] = block.start.split(':').map(Number);
+        const [endH, endM] = block.end.split(':').map(Number);
 
-      while (currentTime.getTime() + slotDuration <= dayEnd.getTime()) {
-        const slotEnd = new Date(currentTime.getTime() + slotDuration);
-        const isAvailable = !bookings.some(b => {
-          const bStart = new Date(b.startTime).getTime() - bufferMs;
-          const bEnd = new Date(b.endTime).getTime() + bufferMs;
-          return currentTime.getTime() < bEnd && slotEnd.getTime() > bStart;
+        const blockStart = new Date(date);
+        blockStart.setHours(startH, startM, 0, 0);
+        const blockEnd = new Date(date);
+        blockEnd.setHours(endH, endM, 0, 0);
+
+        const bookings = await this.prisma.booking.findMany({
+          where: {
+            technicianId: tech.id,
+            startTime: { gte: blockStart },
+            endTime: { lte: new Date(blockEnd.getTime() + 86400000) },
+            status: { notIn: ['CANCELLED', 'NO_SHOW'] as any },
+          },
+          orderBy: { startTime: 'asc' },
         });
 
-        if (isAvailable) {
-          slots.push({
-            technicianId: tech.id,
-            technicianName: `${tech.firstName} ${tech.lastName}`,
-            startTime: new Date(currentTime),
-            endTime: slotEnd,
-          });
-        }
+        let currentTime = new Date(blockStart);
 
-        currentTime = new Date(currentTime.getTime() + intervalMs);
+        while (currentTime.getTime() + slotDuration <= blockEnd.getTime()) {
+          const slotEnd = new Date(currentTime.getTime() + slotDuration);
+          const isAvailable = !bookings.some(b => {
+            const bStart = new Date(b.startTime).getTime() - bufferMs;
+            const bEnd = new Date(b.endTime).getTime() + bufferMs;
+            return currentTime.getTime() < bEnd && slotEnd.getTime() > bStart;
+          });
+
+          if (isAvailable) {
+            slots.push({
+              technicianId: tech.id,
+              technicianName: `${tech.firstName} ${tech.lastName}`,
+              startTime: new Date(currentTime),
+              endTime: slotEnd,
+            });
+          }
+
+          currentTime = new Date(currentTime.getTime() + intervalMs);
+        }
       }
     }
 

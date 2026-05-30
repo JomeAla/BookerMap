@@ -12,6 +12,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { formatCurrency } from '@/lib/utils'
 import { ChevronLeft, ChevronRight, Calendar, Clock, Building2 } from 'lucide-react'
+import { ChatWidget } from '@/components/chat/chat-widget'
 import type { Service, Tenant } from '@/types'
 
 export default function PublicBookingPage() {
@@ -27,7 +28,7 @@ export default function PublicBookingPage() {
   const { data: tenant } = useQuery({
     queryKey: ['public-tenant', tenantSlug],
     queryFn: async () => {
-      const { data } = await api.get(`/public/tenant/${tenantSlug}`)
+      const { data } = await api.get(`/public/tenants/${tenantSlug}`)
       return data.data as Tenant
     },
   })
@@ -233,6 +234,7 @@ export default function PublicBookingPage() {
           </CardContent>
         </Card>
       </div>
+      <ChatWidget tenantSlug={tenantSlug} />
     </div>
   )
 }

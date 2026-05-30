@@ -4,7 +4,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Settings, Users, Sparkles, CreditCard, Tag } from 'lucide-react'
+import { Settings, Users, Sparkles, CreditCard, Tag, Calendar, MapPin, Webhook, Star } from 'lucide-react'
 
 const tabs = [
   { href: '/settings', label: 'General', icon: Settings },
@@ -12,6 +12,10 @@ const tabs = [
   { href: '/settings/ai', label: 'AI Agent', icon: Sparkles },
   { href: '/settings/payments', label: 'Payments', icon: CreditCard },
   { href: '/settings/coupons', label: 'Coupons', icon: Tag },
+  { href: '/settings/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/settings/locations', label: 'Locations', icon: MapPin },
+  { href: '/settings/reviews', label: 'Reviews', icon: Star },
+  { href: '/settings/webhooks', label: 'Webhooks', icon: Webhook },
 ]
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {

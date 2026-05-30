@@ -125,6 +125,21 @@ export class InvoiceService {
     return this.prisma.invoice.delete({ where: { id } });
   }
 
+  async getForPdf(tenantId: string, id: string) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, tenantId },
+      include: {
+        lineItems: true,
+        customer: true,
+        booking: { include: { service: true } },
+        payments: true,
+        tenant: true,
+      },
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    return invoice;
+  }
+
   async sendInvoice(tenantId: string, id: string) {
     const invoice = await this.findById(tenantId, id);
     if (invoice.status !== 'DRAFT') throw new BadRequestException('Only draft invoices can be sent');

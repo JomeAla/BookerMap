@@ -11,6 +11,10 @@ export class ChatMessageDto {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, any>;
+
+  @IsOptional()
+  @IsString()
+  tenantSlug?: string;
 }
 
 export class ChatResponse {

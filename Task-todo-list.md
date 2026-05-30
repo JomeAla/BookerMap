@@ -121,14 +121,15 @@
 - [x] Create invoice (line items, tax, discount)
 - [x] Send invoice (via EmailService)
 - [x] Mark as paid
-- [ ] PDF generation — not started
+- [x] PDF generation
 
 ### Task 24: Build Notification Module
 - [x] EmailService (SMTP + console fallback)
 - [x] SmsService (stub)
 - [x] NotificationService (in-app records)
+- [x] NotificationPanel dropdown + /notifications page (filter tabs, pagination, mark read)
 - [x] Email templates (confirmation, reminder, invoice, feedback, password reset)
-- [~] Reminder cron — EmailService/SmsService ready, not wired to scheduler
+- [x] Reminder cron — ReminderCronService runs hourly via @nestjs/schedule, sends 24h-before reminders with dedup
 
 ### Task 25: Set Up Webhook Module
 - [x] Webhook CRUD
@@ -271,10 +272,10 @@
 - [x] Save conversation history
 
 ### Task 46: Build Chat Interface (Frontend)
-- [ ] Floating chat widget — not started
-- [ ] Chat window with messages — not started
-- [ ] Typing indicator — not started
-- [ ] Quick action buttons — not started
+- [x] Floating chat widget — ChatWidget component with bubble button + slide-up panel
+- [x] Chat window with messages — user/assistant bubbles with left/right alignment
+- [x] Typing indicator — Loader2 spinner while AI responds
+- [x] Quick action buttons — rendered below assistant messages
 - [ ] Chat history viewer — not started
 
 ### Task 47: Admin Configuration Interface
@@ -339,9 +340,9 @@
 - [x] Add service dialog
 
 ### Task 59: Build Booking Calendar
-- [~] Month view — working
-- [ ] Week view — placeholder, needs proper implementation
-- [ ] Day view — placeholder, needs proper implementation
+- [x] Month view — grid with booking chips, +N more, click to navigate
+- [x] Week view — horizontal timeline with absolute-positioned booking blocks
+- [x] Day view — vertical hourly timeline with booking details
 - [ ] Drag and drop — not started
 - [ ] Click to create booking — not started
 
@@ -364,7 +365,7 @@
 - [x] AI settings (language, style, templates)
 - [x] Payment settings (key inputs + test)
 - [x] Settings sub-navigation tabs
-- [~] Payment settings save — not fully wired
+- [x] Payment settings save — Paystack/Flutterwave save, test, toggle all functional
 
 ### Task 64: Build Technician Mobile View
 - [x] Today's jobs list
@@ -402,37 +403,37 @@
 
 ## REMAINING TASKS
 
-- [~] **Route optimization** — integrate OSRM or Google Maps to auto-optimize technician routes
-- [~] **SMS/email reminders** — wire up cron job to send 24h booking reminders
-- [~] **Reports page** — revenue, booking trends, technician performance, top services
-- [~] **Recurring bookings UI** — model exists, build frontend for weekly/monthly schedules
-- [~] **Coupon/promo codes UI** — model exists, build admin CRUD + checkout validation
-- [~] **Payment settings save** — wire save buttons to correct API endpoints
-- [~] **Test suite** — unit tests for critical services (auth, booking, invoice)
-- [~] **Calendar week/day views** — proper day/week layouts (currently re-use month data)
+- [x] **Route optimization** — dispatches list page with checkboxes + Optimize Route button via POST /routing/optimize
+- [x] **SMS/email reminders** — ReminderCronService runs hourly, sends 24h-before reminders via EmailService + SmsService with dedup
+- [x] **Reports page** — revenue, booking trends, technician performance, top services
+- [x] **Recurring bookings UI** — list page + create form with frequency/interval/discount
+- [x] **Coupon/promo codes UI** — admin CRUD + checkout validation with discount application
+- [x] **Payment settings save** — Paystack/Flutterwave save, test, toggle all functional
+- [x] **Test suite** — 43 unit tests across auth (10), booking (17), invoice (16) all passing
+- [x] **Calendar week/day views** — proper day/week layouts with time-slot positioning
 - [ ] **Customer mobile app** — React Native app for booking + tracking
-- [ ] **Google Calendar / iCal sync** — two-way calendar sync for technicians
-- [ ] **Review & rating system** — post-service feedback collection + public display
-- [ ] **Multi-location per tenant** — single business manages multiple branches
+- [x] **Google Calendar sync** — OAuth 2.0 connect/disconnect, manual sync future bookings via settings/calendar UI
+- [x] **Review & rating system** — post-service feedback collection + admin moderation + public display
+- [x] **Multi-location per tenant** — single business manages multiple branches
 - [ ] **Inventory management** — track materials/products used per job
 - [ ] **Commission tracking** — per-technician commission reports
 - [ ] **Automated marketing** — email campaigns for re-engaging lapsed customers
 - [ ] **WhatsApp integration** — booking confirmations/reminders via WhatsApp Business API
 - [ ] **POS / on-site payment** — Paystack Terminal / Flutterwave POS
 - [ ] **Dynamic pricing** — surge pricing for same-day, discounts for off-peak
-- [ ] **Technician availability settings**
-- [ ] **Service images upload**
-- [ ] **Embedded booking widget** (script tag for any website)
-- [ ] **Chat widget UI** on customer-facing pages
-- [ ] **Customer tags and groups**
-- [ ] **Import/export customers**
-- [ ] **Invoice PDF generation**
-- [ ] **Webhook management UI** in admin panel
-- [ ] **In-app notification viewer**
-- [ ] **Team notifications**
+- [x] **Technician availability settings**
+- [x] **Service images upload** — base64 image upload + thumbnail preview on service card
+- [x] **Embedded booking widget** — script tag for any website, injects floating button + iframe with compact 4-step booking flow
+- [x] **Chat widget UI** on customer-facing pages
+- [x] **Customer tags and groups** — tag CRUD, filter UI, inline editor on detail page
+- [x] **Import/export customers** — CSV export download + CSV import upsert
+- [x] **Invoice PDF generation**
+- [x] **Webhook management UI** in admin panel
+- [x] **In-app notification viewer**
+- [x] **Team notifications** — multi-select team members + send in-app notification
 - [ ] **Saved cards (tokenization)** for Paystack
 - [ ] **Subscription management** (tenant billing)
-- [ ] **Skill tagging** for technicians
+- [x] **Skill tagging** for technicians — skills JSON field, editor UI + autocomplete
 - [ ] **Auto-assignment rules** for dispatches
 - [ ] **Job offer system** (techs claim jobs)
 - [ ] **SMS/WhatsApp delivery tracking**

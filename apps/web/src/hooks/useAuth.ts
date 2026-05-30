@@ -19,11 +19,12 @@ export function useAuth() {
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {
-    const { data } = await api.post('/auth/login', { email, password })
-    setToken(data.token)
-    setUser(data.user)
-    setUserState(data.user)
-    return data.user
+    const res = await api.post('/auth/login', { email, password })
+    const payload = res.data.data
+    setToken(payload.accessToken)
+    setUser(payload.user)
+    setUserState(payload.user)
+    return payload.user
   }, [])
 
   const register = useCallback(async (payload: { businessName: string; email: string; password: string }) => {

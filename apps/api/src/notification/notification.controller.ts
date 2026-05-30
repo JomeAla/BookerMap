@@ -13,6 +13,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { NotificationService } from './notification.service';
 import { NotificationFilterDto } from './dto/notification-filter.dto';
+import { SendTeamNotificationDto } from './dto/send-team-notification.dto';
 
 @ApiTags('Notifications')
 @ApiBearerAuth()
@@ -49,6 +50,15 @@ export class NotificationController {
     @Body() body: { recipient: string; subject: string; message: string },
   ) {
     return this.notificationService.sendEmail(user.tenantId, body.recipient, body.subject, body.message);
+  }
+
+  @Post('send-team')
+  @ApiOperation({ summary: 'Send notification to team members' })
+  async sendTeam(
+    @CurrentUser() user: { id: string; tenantId: string },
+    @Body() dto: SendTeamNotificationDto,
+  ) {
+    return this.notificationService.sendTeamNotification(user.tenantId, dto.userIds, dto.title, dto.body);
   }
 
   @Post('test-sms')

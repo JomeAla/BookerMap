@@ -10,6 +10,7 @@ import { StatusBadge } from '@/components/ui/badge'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { CalendarCheck, Clock, User, Building2, CreditCard } from 'lucide-react'
+import { ChatWidget } from '@/components/chat/chat-widget'
 import type { Booking } from '@/types'
 
 function PortalContent() {
@@ -84,6 +85,7 @@ function PortalContent() {
           </div>
         )}
       </main>
+      <ChatWidget />
     </div>
   )
 }

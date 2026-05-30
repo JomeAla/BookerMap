@@ -7,12 +7,12 @@ import Link from 'next/link'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { StatusBadge } from '@/components/ui/badge'
+import { StatusBadge, Badge } from '@/components/ui/badge'
 import { PageLoader } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowLeft, User, Phone, Mail, Clock, Wrench, DollarSign, MapPin } from 'lucide-react'
-import type { Booking, Dispatch } from '@/types'
+import { ArrowLeft, User, Phone, Mail, Clock, Wrench, DollarSign, MapPin, Star } from 'lucide-react'
+import type { Booking, Dispatch, Review } from '@/types'
 
 export default function BookingDetailPage() {
   const params = useParams()
@@ -115,6 +115,30 @@ export default function BookingDetailPage() {
           </CardContent>
         </Card>
 
+        {booking.location && (
+          <Card>
+            <CardHeader><CardTitle className="text-base">Location</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-3 text-sm">
+                <MapPin className="h-4 w-4 text-gray-400" />
+                <span className="font-medium">{booking.location.name}</span>
+              </div>
+              {booking.location.address && (
+                <div className="flex items-center gap-3 text-sm">
+                  <MapPin className="h-4 w-4 text-gray-400" />
+                  <span>{booking.location.address}</span>
+                </div>
+              )}
+              {booking.location.phone && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Phone className="h-4 w-4 text-gray-400" />
+                  <span>{booking.location.phone}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader><CardTitle className="text-base">Dispatch</CardTitle></CardHeader>
           <CardContent className="space-y-4">
@@ -156,6 +180,108 @@ export default function BookingDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      <ReviewSection booking={booking} />
     </div>
+  )
+}
+
+function ReviewSection({ booking }: { booking: Booking }) {
+  const { addToast } = useToast()
+  const queryClient = useQueryClient()
+  const [rating, setRating] = React.useState(0)
+  const [comment, setComment] = React.useState('')
+  const [hoverRating, setHoverRating] = React.useState(0)
+
+  const { data: existingReview } = useQuery({
+    queryKey: ['booking-review', booking.id],
+    queryFn: async () => {
+      const { data } = await api.get('/reviews')
+      return (data.data as Review[]).find((r) => r.bookingId === booking.id)
+    },
+    enabled: booking.status === 'COMPLETED',
+  })
+
+  const reviewMutation = useMutation({
+    mutationFn: async ({ rating, comment }: { rating: number; comment: string }) => {
+      const { data } = await api.post('/reviews', { bookingId: booking.id, rating, comment })
+      return data.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['booking-review', booking.id] })
+      addToast('Review submitted', 'success')
+    },
+    onError: () => addToast('Failed to submit review', 'error'),
+  })
+
+  if (booking.status !== 'COMPLETED') return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Star className="h-4 w-4 text-yellow-500" />
+          Customer Review
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {existingReview ? (
+          <div className="space-y-3">
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={`h-5 w-5 ${star <= existingReview.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 dark:text-gray-600'}`}
+                />
+              ))}
+            </div>
+            {existingReview.comment && (
+              <p className="text-sm text-gray-700 dark:text-gray-300">{existingReview.comment}</p>
+            )}
+            {existingReview.adminReply && (
+              <div className="pl-3 border-l-2 border-blue-400">
+                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">Your reply:</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{existingReview.adminReply}</p>
+              </div>
+            )}
+            <Badge className={existingReview.status === 'APPROVED' ? 'bg-green-100 text-green-700' : existingReview.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}>
+              {existingReview.status === 'APPROVED' ? 'Approved' : existingReview.status === 'REJECTED' ? 'Rejected' : 'Pending'}
+            </Badge>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400">How was your service experience?</p>
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  className="transition-colors"
+                  onMouseEnter={() => setHoverRating(star)}
+                  onMouseLeave={() => setHoverRating(0)}
+                  onClick={() => setRating(star)}
+                >
+                  <Star
+                    className={`h-8 w-8 ${star <= (hoverRating || rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 dark:text-gray-600 hover:text-yellow-300'}`}
+                  />
+                </button>
+              ))}
+            </div>
+            <textarea
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm min-h-[80px] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Share your experience (optional)..."
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+            />
+            <Button
+              onClick={() => reviewMutation.mutate({ rating, comment })}
+              disabled={rating === 0 || reviewMutation.isPending}
+            >
+              {reviewMutation.isPending ? 'Submitting...' : 'Submit Review'}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

@@ -69,6 +69,9 @@ export default function RecurringBookingsPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Recurring Schedules</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage weekly, monthly, and custom recurring bookings</p>
         </div>
+        <Link href="/bookings/new">
+          <Button><Plus className="h-4 w-4" /> New Schedule</Button>
+        </Link>
       </div>
 
       {isLoading ? <Spinner /> : !recurringList?.length ? (

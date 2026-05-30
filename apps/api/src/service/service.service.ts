@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { UserRole } from '@prisma/client';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
 
@@ -73,6 +74,24 @@ export class ServiceService {
   async remove(tenantId: string, id: string) {
     await this.findById(tenantId, id);
     return this.prisma.service.delete({ where: { id } });
+  }
+
+  async updateImage(tenantId: string, id: string, imageUrl?: string) {
+    await this.findById(tenantId, id);
+    return this.prisma.service.update({
+      where: { id },
+      data: { imageUrl },
+      include: { modifiers: true, intakeFields: true, category: true },
+    });
+  }
+
+  async getAllSkills(tenantId: string): Promise<string[]> {
+    const users = await this.prisma.user.findMany({
+      where: { tenantId, role: UserRole.TECHNICIAN },
+      select: { skills: true },
+    });
+    const allSkills = users.flatMap((u) => (u.skills as string[]) || []);
+    return [...new Set(allSkills)].sort();
   }
 
   async createCategory(tenantId: string, data: { name: string; sortOrder?: number }) {

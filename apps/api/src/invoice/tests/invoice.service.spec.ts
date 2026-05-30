@@ -17,9 +17,10 @@ describe('InvoiceService', () => {
       findMany: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
       count: jest.fn(),
     },
-    invoiceLineItem: { createMany: jest.fn() },
+    invoiceLineItem: { createMany: jest.fn(), deleteMany: jest.fn() },
     booking: { findFirst: jest.fn() },
     customer: { findFirst: jest.fn() },
     payment: { create: jest.fn() },
@@ -166,6 +167,85 @@ describe('InvoiceService', () => {
       });
 
       await expect(service.markAsPaid('tenant-1', 'inv-1')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('findAll', () => {
+    it('should return invoices filtered by status', async () => {
+      mockPrisma.invoice.findMany.mockResolvedValue([{ id: 'inv-1', status: 'DRAFT' }]);
+
+      const result = await service.findAll('tenant-1', { status: 'DRAFT' });
+
+      expect(result).toHaveLength(1);
+      expect(mockPrisma.invoice.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ tenantId: 'tenant-1', status: 'DRAFT' }),
+        }),
+      );
+    });
+  });
+
+  describe('findById', () => {
+    it('should return an invoice by id', async () => {
+      mockPrisma.invoice.findFirst.mockResolvedValue({ id: 'inv-1', status: 'DRAFT', lineItems: [], customer: {}, booking: null, payments: [] });
+
+      const result = await service.findById('tenant-1', 'inv-1');
+
+      expect(result).toBeDefined();
+      expect(result.id).toBe('inv-1');
+    });
+
+    it('should throw NotFoundException if invoice not found', async () => {
+      mockPrisma.invoice.findFirst.mockResolvedValue(null);
+
+      await expect(service.findById('tenant-1', 'invalid')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('update', () => {
+    it('should update invoice fields', async () => {
+      mockPrisma.invoice.findFirst.mockResolvedValue({ id: 'inv-1', status: 'DRAFT' });
+      mockPrisma.invoice.update.mockResolvedValue({ id: 'inv-1', status: 'DRAFT', notes: 'Updated notes' });
+
+      const result = await service.update('tenant-1', 'inv-1', { notes: 'Updated notes' } as any);
+
+      expect(result).toBeDefined();
+      expect(mockPrisma.invoice.update).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException for non-existent invoice', async () => {
+      mockPrisma.invoice.findFirst.mockResolvedValue(null);
+
+      await expect(service.update('tenant-1', 'invalid', {} as any)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('remove', () => {
+    it('should delete an invoice', async () => {
+      mockPrisma.invoice.findFirst.mockResolvedValue({ id: 'inv-1', status: 'DRAFT' });
+      mockPrisma.invoice.delete.mockResolvedValue({ id: 'inv-1' });
+
+      const result = await service.remove('tenant-1', 'inv-1');
+
+      expect(result).toBeDefined();
+      expect(mockPrisma.invoice.delete).toHaveBeenCalledWith({ where: { id: 'inv-1' } });
+    });
+
+    it('should throw NotFoundException for non-existent invoice', async () => {
+      mockPrisma.invoice.findFirst.mockResolvedValue(null);
+
+      await expect(service.remove('tenant-1', 'invalid')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('sendInvoice', () => {
+    it('should throw BadRequestException if not a draft', async () => {
+      mockPrisma.invoice.findFirst.mockResolvedValue({
+        id: 'inv-1', status: 'SENT', customer: { email: 'test@test.com' },
+        lineItems: [],
+      });
+
+      await expect(service.sendInvoice('tenant-1', 'inv-1')).rejects.toThrow(BadRequestException);
     });
   });
 });

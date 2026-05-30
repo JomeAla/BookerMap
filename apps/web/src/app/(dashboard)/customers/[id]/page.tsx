@@ -2,21 +2,27 @@
 
 import * as React from 'react'
 import { useParams } from 'next/navigation'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { api } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { StatusBadge } from '@/components/ui/badge'
+import { Badge, StatusBadge } from '@/components/ui/badge'
 import { PageLoader } from '@/components/ui/spinner'
 import { formatCurrency, formatDate, formatPhone } from '@/lib/utils'
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, FileText } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, FileText, Tag, Edit3, X, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { useToast } from '@/components/ui/toast'
 import type { Customer } from '@/types'
 
 export default function CustomerDetailPage() {
   const params = useParams()
   const id = params.id as string
+  const queryClient = useQueryClient()
+  const { addToast } = useToast()
+  const [editingTags, setEditingTags] = React.useState(false)
+  const [tagInput, setTagInput] = React.useState('')
 
   const { data: customer, isLoading } = useQuery({
     queryKey: ['customer', id],
@@ -24,6 +30,20 @@ export default function CustomerDetailPage() {
       const { data } = await api.get(`/customers/${id}`)
       return data.data as Customer
     },
+  })
+
+  const updateTagsMutation = useMutation({
+    mutationFn: async (tags: string[]) => {
+      const { data } = await api.patch(`/customers/${id}/tags`, { tags })
+      return data.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer', id] })
+      queryClient.invalidateQueries({ queryKey: ['customer-tags'] })
+      setEditingTags(false)
+      addToast('Tags updated', 'success')
+    },
+    onError: () => addToast('Failed to update tags', 'error'),
   })
 
   if (isLoading) return <PageLoader />
@@ -57,6 +77,57 @@ export default function CustomerDetailPage() {
             <div className="flex items-center gap-3 text-sm">
               <Calendar className="h-4 w-4 text-gray-400" />
               <span>Customer since {formatDate(customer.createdAt, 'MMM yyyy')}</span>
+            </div>
+            <div className="flex items-start gap-3 text-sm">
+              <Tag className="h-4 w-4 text-gray-400 mt-0.5" />
+              <div className="flex-1">
+                {editingTags ? (
+                  <div className="space-y-2">
+                    <Input
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      placeholder="tag1, tag2, tag3"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const tags = tagInput.split(',').map(t => t.trim()).filter(Boolean)
+                          updateTagsMutation.mutate(tags)
+                        }}
+                        disabled={updateTagsMutation.isPending}
+                      >
+                        <Check className="h-3 w-3 mr-1" /> Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingTags(false)
+                          setTagInput(customer.tags?.join(', ') || '')
+                        }}
+                      >
+                        <X className="h-3 w-3 mr-1" /> Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {customer.tags?.length ? customer.tags.map((tag) => (
+                      <Badge key={tag} variant="secondary">{tag}</Badge>
+                    )) : <span className="text-gray-500">No tags</span>}
+                    <button
+                      onClick={() => {
+                        setTagInput(customer.tags?.join(', ') || '')
+                        setEditingTags(true)
+                      }}
+                      className="text-blue-500 hover:text-blue-700 ml-1"
+                    >
+                      <Edit3 className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

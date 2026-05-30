@@ -1,7 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import { useQuery } from '@tanstack/react-query'
+import Link from 'next/link'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
-import { Users, UserPlus, Shield } from 'lucide-react'
+import { Users, UserPlus, Shield, Clock, Send, X, Plus } from 'lucide-react'
 import type { User, UserRole } from '@/types'
 
 const roleOptions = [
@@ -25,6 +26,9 @@ export default function TeamPage() {
   const { addToast } = useToast()
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [form, setForm] = React.useState({ email: '', firstName: '', lastName: '', role: 'TECHNICIAN' })
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
+  const [notifyDialogOpen, setNotifyDialogOpen] = React.useState(false)
+  const [notifyForm, setNotifyForm] = React.useState({ title: '', body: '' })
 
   const { data: team, isLoading } = useQuery({
     queryKey: ['team'],
@@ -33,6 +37,88 @@ export default function TeamPage() {
       return data.data as User[]
     },
   })
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (!team) return
+    if (selectedIds.size === team.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(team.map((m) => m.id)))
+    }
+  }
+
+  const sendNotification = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      await api.post('/notifications/send-team', {
+        userIds: Array.from(selectedIds),
+        title: notifyForm.title,
+        body: notifyForm.body,
+      })
+      addToast('Notification sent', 'success')
+      setNotifyDialogOpen(false)
+      setNotifyForm({ title: '', body: '' })
+      setSelectedIds(new Set())
+    } catch (err: any) {
+      addToast(err.response?.data?.message || 'Failed to send notification', 'error')
+    }
+  }
+
+  const [skillsDialogOpen, setSkillsDialogOpen] = React.useState(false)
+  const [editingSkillsUser, setEditingSkillsUser] = React.useState<User | null>(null)
+  const [skillsInput, setSkillsInput] = React.useState('')
+  const [currentSkills, setCurrentSkills] = React.useState<string[]>([])
+
+  const { data: allSkills } = useQuery({
+    queryKey: ['all-skills'],
+    queryFn: async () => {
+      const { data } = await api.get('/services/skills')
+      return data.data as string[]
+    },
+    enabled: skillsDialogOpen,
+  })
+
+  const openSkillsDialog = (member: User) => {
+    setEditingSkillsUser(member)
+    setCurrentSkills(member.skills || [])
+    setSkillsInput('')
+    setSkillsDialogOpen(true)
+  }
+
+  const addSkill = (skill: string) => {
+    const trimmed = skill.trim()
+    if (trimmed && !currentSkills.includes(trimmed)) {
+      setCurrentSkills([...currentSkills, trimmed])
+    }
+    setSkillsInput('')
+  }
+
+  const removeSkill = (skill: string) => {
+    setCurrentSkills(currentSkills.filter((s) => s !== skill))
+  }
+
+  const saveSkills = async () => {
+    if (!editingSkillsUser) return
+    try {
+      await api.put(`/users/${editingSkillsUser.id}/skills`, { skills: currentSkills })
+      addToast('Skills updated', 'success')
+      setSkillsDialogOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['team'] })
+    } catch (err: any) {
+      addToast(err.response?.data?.message || 'Failed to update skills', 'error')
+    }
+  }
+
+  const queryClient = useQueryClient()
 
   const inviteUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,24 +139,117 @@ export default function TeamPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Team</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your team members</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger>
-            <Button><UserPlus className="h-4 w-4 mr-2" /> Invite Member</Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-3">
+          <Button disabled={selectedIds.size === 0} onClick={() => setNotifyDialogOpen(true)}>
+            <Send className="h-4 w-4 mr-2" /> Notify
+            {selectedIds.size > 0 && <span className="ml-1">({selectedIds.size})</span>}
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger>
+              <Button><UserPlus className="h-4 w-4 mr-2" /> Invite Member</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Invite Team Member</DialogTitle></DialogHeader>
+              <form onSubmit={inviteUser} className="space-y-4">
+                <Input label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="First Name" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required />
+                  <Input label="Last Name" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required />
+                </div>
+                <Select label="Role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} options={roleOptions} />
+                <div className="flex justify-end gap-3">
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit">Send Invite</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <Dialog open={notifyDialogOpen} onOpenChange={setNotifyDialogOpen}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Invite Team Member</DialogTitle></DialogHeader>
-            <form onSubmit={inviteUser} className="space-y-4">
-              <Input label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-              <div className="grid grid-cols-2 gap-4">
-                <Input label="First Name" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required />
-                <Input label="Last Name" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required />
+            <DialogHeader><DialogTitle>Send Notification to Team</DialogTitle></DialogHeader>
+            <form onSubmit={sendNotification} className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-500 mb-2">
+                  Sending to {selectedIds.size} member{selectedIds.size !== 1 ? 's' : ''}:
+                </p>
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {team?.filter((m) => selectedIds.has(m.id)).map((m) => (
+                    <span key={m.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs">
+                      {m.firstName} {m.lastName}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <Select label="Role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} options={roleOptions} />
+              <Input label="Title" value={notifyForm.title} onChange={(e) => setNotifyForm({ ...notifyForm, title: e.target.value })} required />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Message</label>
+                <textarea
+                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={4}
+                  value={notifyForm.body}
+                  onChange={(e) => setNotifyForm({ ...notifyForm, body: e.target.value })}
+                  required
+                />
+              </div>
               <div className="flex justify-end gap-3">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                <Button type="submit">Send Invite</Button>
+                <Button type="button" variant="outline" onClick={() => setNotifyDialogOpen(false)}>Cancel</Button>
+                <Button type="submit">Send</Button>
               </div>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={skillsDialogOpen} onOpenChange={setSkillsDialogOpen}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Skills — {editingSkillsUser?.firstName} {editingSkillsUser?.lastName}</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {currentSkills.length === 0 ? (
+                  <p className="text-sm text-gray-400">No skills assigned</p>
+                ) : (
+                  currentSkills.map((skill) => (
+                    <span key={skill} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-md text-sm">
+                      {skill}
+                      <button onClick={() => removeSkill(skill)} className="hover:text-red-600">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))
+                )}
+              </div>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    placeholder="Type a skill..."
+                    value={skillsInput}
+                    onChange={(e) => setSkillsInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        addSkill(skillsInput)
+                      }
+                    }}
+                    list="skill-suggestions"
+                  />
+                  <datalist id="skill-suggestions">
+                    {(allSkills || [])
+                      .filter((s) => !currentSkills.includes(s))
+                      .map((s) => (
+                        <option key={s} value={s} />
+                      ))}
+                  </datalist>
+                </div>
+                <Button onClick={() => addSkill(skillsInput)} disabled={!skillsInput.trim()}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={() => setSkillsDialogOpen(false)}>Cancel</Button>
+                <Button onClick={saveSkills}>Save</Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
@@ -92,18 +271,36 @@ export default function TeamPage() {
           ) : (
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last Login</TableHead>
-                  </TableRow>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300"
+                          checked={team ? selectedIds.size === team.length : false}
+                          onChange={toggleSelectAll}
+                        />
+                      </TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Skills</TableHead>
+                      <TableHead>Last Login</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
                 </TableHeader>
                 <TableBody>
                   {team.map((member) => (
                     <TableRow key={member.id}>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300"
+                          checked={selectedIds.has(member.id)}
+                          onChange={() => toggleSelect(member.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">{member.firstName} {member.lastName}</TableCell>
                       <TableCell className="text-sm">{member.email}</TableCell>
                       <TableCell>
@@ -117,8 +314,36 @@ export default function TeamPage() {
                           {member.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        {member.role === 'TECHNICIAN' ? (
+                          <div className="flex flex-wrap gap-1 max-w-[200px]">
+                            {(member.skills || []).slice(0, 3).map((skill) => (
+                              <Badge key={skill} variant="secondary" className="text-xs">{skill}</Badge>
+                            ))}
+                            {(member.skills || []).length > 3 && (
+                              <span className="text-xs text-gray-400">+{member.skills!.length - 3}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm text-gray-500">
                         {member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleDateString() : 'Never'}
+                      </TableCell>
+                      <TableCell>
+                        {member.role === 'TECHNICIAN' && (
+                          <div className="flex items-center gap-1">
+                            <Link href={`/settings/team/${member.id}/availability`}>
+                              <Button variant="ghost" size="sm">
+                                <Clock className="h-3.5 w-3.5 mr-1" /> Availability
+                              </Button>
+                            </Link>
+                            <Button variant="ghost" size="sm" onClick={() => openSkillsDialog(member)}>
+                              <Plus className="h-3.5 w-3.5 mr-1" /> Skills
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

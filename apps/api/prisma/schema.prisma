@@ -54,6 +54,12 @@ enum NotificationType {
   IN_APP
 }
 
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum JobStatus {
   ASSIGNED
   EN_ROUTE
@@ -80,6 +86,7 @@ model Tenant {
   users              User[]
   customers          Customer[]
   services           Service[]
+  serviceCategories  ServiceCategory[]
   territories        Territory[]
   bookings           Booking[]
   invoices           Invoice[]
@@ -89,8 +96,9 @@ model Tenant {
   aiConversations    AiConversation[]
   paymentSettings    PaymentSettings[]
   coupons            Coupon[]
-  serviceCategories  ServiceCategory[]
   recurringBookings  RecurringBooking[]
+  locations          Location[]
+  reviews            Review[]
 
   @@map("tenants")
 }
@@ -110,16 +118,22 @@ model User {
   lastLoginAt         DateTime?
   resetToken          String?    @unique
   resetTokenExpiresAt DateTime?
+  availability        Json?
+  skills              Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId   String
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
 
   assignedBookings Booking[]  @relation("AssignedTechnician")
   jobAssignments   Dispatch[] @relation("AssignedUser")
+  reviews          Review[]   @relation("TechnicianReviews")
   refreshTokens    RefreshToken[]
   notifications    Notification[]
+  googleCalendarToken GoogleCalendarToken?
 
   @@unique([tenantId, email])
   @@map("users")
@@ -136,12 +150,15 @@ model Customer {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId   String
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
 
   addresses CustomerAddress[]
   bookings  Booking[]
   invoices  Invoice[]
+  reviews   Review[]
 
   @@unique([tenantId, phone])
   @@map("customers")
@@ -270,6 +287,8 @@ model Booking {
 
   tenantId     String
   tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locationId   String?
+  location     Location? @relation(fields: [locationId], references: [id])
   customerId   String
   customer     Customer  @relation(fields: [customerId], references: [id])
   serviceId    String
@@ -279,10 +298,32 @@ model Booking {
 
   invoices     Invoice[]
   dispatch     Dispatch?
+  reviews      Review[]
   recurrenceId String?
   recurrence   RecurringBooking? @relation(fields: [recurrenceId], references: [id])
 
   @@map("bookings")
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  phone     String?
+  email     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  bookings  Booking[]
+  users     User[]
+  customers Customer[]
+
+  @@unique([tenantId, name])
+  @@map("locations")
 }
 
 model RecurringBooking {
@@ -303,6 +344,27 @@ model RecurringBooking {
   bookings Booking[]
 
   @@map("recurring_bookings")
+}
+
+model Review {
+  id          String       @id @default(cuid())
+  rating      Int
+  comment     String?
+  adminReply  String?
+  status      ReviewStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookingId    String   @unique
+  booking      Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  technicianId String?
+  technician   User?    @relation("TechnicianReviews", fields: [technicianId], references: [id])
+
+  @@map("reviews")
 }
 
 model Dispatch {
@@ -498,6 +560,21 @@ model AiResponse {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("ai_responses")
+}
+
+model GoogleCalendarToken {
+  id            String   @id @default(cuid())
+  accessToken   String
+  refreshToken  String?
+  expiryDate    DateTime?
+  googleEmail   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("google_calendar_tokens")
 }
 
 model RefreshToken {

@@ -18,6 +18,7 @@ import {
   LogOut,
   Building2,
   BarChart3,
+  Truck,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
@@ -29,6 +30,7 @@ const navItems = [
   { href: '/services', label: 'Services', icon: Wrench },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/invoices', label: 'Invoices', icon: FileText },
+  { href: '/dispatches', label: 'Dispatches', icon: Truck },
   { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/settings', label: 'Settings', icon: Settings },
