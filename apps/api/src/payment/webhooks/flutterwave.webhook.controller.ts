@@ -1,8 +1,10 @@
 import { Controller, Post, Headers, Body, Logger, HttpException, HttpCode } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WebhookService } from '../../webhook/webhook.service';
 
+@ApiTags('Flutterwave Webhook')
 @Controller('payments/webhooks/flutterwave')
 export class FlutterwaveWebhookController {
   private readonly logger = new Logger(FlutterwaveWebhookController.name);
@@ -14,6 +16,9 @@ export class FlutterwaveWebhookController {
 
   @Post()
   @HttpCode(200)
+  @ApiOperation({ summary: 'Flutterwave webhook handler', description: 'Handle incoming Flutterwave payment webhooks' })
+  @ApiResponse({ status: 200, description: 'Webhook processed' })
+  @ApiResponse({ status: 401, description: 'Invalid signature' })
   async handleWebhook(
     @Headers('verif-hash') verifHash: string,
     @Body() payload: any,

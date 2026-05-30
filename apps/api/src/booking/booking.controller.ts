@@ -2,6 +2,7 @@ import {
   Controller, Get, Post, Patch,
   Body, Param, Query, UseGuards, HttpException,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { BookingService } from './booking.service';
@@ -10,6 +11,8 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { RescheduleBookingDto } from './dto/reschedule-booking.dto';
 import { PrismaService } from '../prisma/prisma.service';
 
+@ApiTags('Bookings')
+@ApiBearerAuth()
 @Controller('bookings')
 @UseGuards(JwtAuthGuard)
 export class BookingController {
@@ -20,11 +23,20 @@ export class BookingController {
   ) {}
 
   @Post()
+  @ApiOperation({ summary: 'Create a new booking' })
+  @ApiResponse({ status: 201, description: 'Booking created' })
+  @ApiResponse({ status: 400, description: 'Invalid input data' })
   create(@TenantId() tenantId: string, @Body() dto: CreateBookingDto) {
     return this.bookingService.create(tenantId, dto);
   }
 
   @Get()
+  @ApiOperation({ summary: 'List all bookings', description: 'Returns filtered list of bookings' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by status' })
+  @ApiQuery({ name: 'dateFrom', required: false, type: String, description: 'Start date filter' })
+  @ApiQuery({ name: 'dateTo', required: false, type: String, description: 'End date filter' })
+  @ApiQuery({ name: 'technicianId', required: false, type: String, description: 'Filter by technician' })
+  @ApiResponse({ status: 200, description: 'List of bookings' })
   findAll(
     @TenantId() tenantId: string,
     @Query('status') status?: string,
@@ -36,6 +48,10 @@ export class BookingController {
   }
 
   @Get('available-slots')
+  @ApiOperation({ summary: 'Get available slots', description: 'Returns available time slots for a service on a date' })
+  @ApiQuery({ name: 'serviceId', required: true, type: String, description: 'Service ID' })
+  @ApiQuery({ name: 'date', required: true, type: String, description: 'Date (YYYY-MM-DD)' })
+  @ApiResponse({ status: 200, description: 'Available time slots' })
   getAvailableSlots(
     @TenantId() tenantId: string,
     @Query('serviceId') serviceId: string,
@@ -45,11 +61,19 @@ export class BookingController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get booking by ID' })
+  @ApiParam({ name: 'id', type: String, description: 'Booking ID' })
+  @ApiResponse({ status: 200, description: 'Booking found' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
   findById(@TenantId() tenantId: string, @Param('id') id: string) {
     return this.bookingService.findById(tenantId, id);
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update booking status' })
+  @ApiParam({ name: 'id', type: String, description: 'Booking ID' })
+  @ApiResponse({ status: 200, description: 'Booking status updated' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
   async updateStatus(
     @TenantId() tenantId: string,
     @Param('id') id: string,
@@ -70,6 +94,11 @@ export class BookingController {
   }
 
   @Post(':id/dispatch')
+  @ApiOperation({ summary: 'Dispatch technician', description: 'Assign a technician to a booking and create dispatch record' })
+  @ApiParam({ name: 'id', type: String, description: 'Booking ID' })
+  @ApiResponse({ status: 201, description: 'Technician dispatched' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
+  @ApiResponse({ status: 409, description: 'Already dispatched' })
   async dispatchTechnician(
     @TenantId() tenantId: string,
     @Param('id') id: string,
@@ -100,11 +129,19 @@ export class BookingController {
   }
 
   @Patch(':id/cancel')
+  @ApiOperation({ summary: 'Cancel a booking' })
+  @ApiParam({ name: 'id', type: String, description: 'Booking ID' })
+  @ApiResponse({ status: 200, description: 'Booking cancelled' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
   cancel(@TenantId() tenantId: string, @Param('id') id: string) {
     return this.bookingService.cancel(tenantId, id);
   }
 
   @Patch(':id/reschedule')
+  @ApiOperation({ summary: 'Reschedule a booking' })
+  @ApiParam({ name: 'id', type: String, description: 'Booking ID' })
+  @ApiResponse({ status: 200, description: 'Booking rescheduled' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
   reschedule(@TenantId() tenantId: string, @Param('id') id: string, @Body() dto: RescheduleBookingDto) {
     return this.bookingService.reschedule(tenantId, id, dto);
   }

@@ -25,7 +25,12 @@ import { LocationModule } from './location/location.module';
 import { ReviewModule } from './review/review.module';
 import { PublicModule } from './public/public.module';
 import { PortalModule } from './portal/portal.module';
+import { PricingModule } from './pricing/pricing.module';
 import { SubscriptionModule } from './subscription/subscription.module';
+import { MarketingModule } from './marketing/marketing.module';
+import { FilesModule } from './files/files.module';
+import { CommissionModule } from './commission/commission.module';
+import { InventoryModule } from './inventory/inventory.module';
 import { CommonModule } from './common/common.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -60,6 +65,11 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     PublicModule,
     PortalModule,
     SubscriptionModule,
+    PricingModule,
+    MarketingModule,
+    FilesModule,
+    CommissionModule,
+    InventoryModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: HttpExceptionFilter },

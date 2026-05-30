@@ -1,11 +1,19 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JobStatus } from '@prisma/client';
 import { CreateDispatchDto } from './dto/create-dispatch.dto';
+import { AutoAssignmentService } from './auto-assignment.service';
+import { BookingGateway } from '../gateway/booking.gateway';
 
 @Injectable()
 export class DispatchService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(DispatchService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private autoAssignmentService: AutoAssignmentService,
+    private bookingGateway: BookingGateway,
+  ) {}
 
   async create(tenantId: string, dto: CreateDispatchDto) {
     const booking = await this.prisma.booking.findFirst({
@@ -100,6 +108,43 @@ export class DispatchService {
         assignedTo: true,
       },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async autoAssign(bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { id: true, tenantId: true, serviceId: true, startTime: true, technicianId: true },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    const existing = await this.prisma.dispatch.findUnique({ where: { bookingId } });
+    if (existing) {
+      this.logger.warn(`Dispatch already exists for booking ${bookingId}`);
+      return existing;
+    }
+
+    const technicianId = await this.autoAssignmentService.findBestTechnician({
+      serviceId: booking.serviceId,
+      dateTime: booking.startTime,
+      tenantId: booking.tenantId,
+    });
+
+    if (!technicianId) {
+      this.logger.warn(`Could not auto-assign technician for booking ${bookingId}`);
+      return null;
+    }
+
+    return this.prisma.dispatch.create({
+      data: {
+        bookingId,
+        assignedToId: technicianId,
+        status: 'ASSIGNED',
+      },
+      include: {
+        booking: { include: { customer: true, service: true } },
+        assignedTo: true,
+      },
     });
   }
 }

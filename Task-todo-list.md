@@ -108,13 +108,13 @@
 - [x] getAvailableSlots (30-min intervals, 8am-5pm)
 - [x] checkConflict (with buffer)
 - [x] calculateEndTime (from service duration)
-- [ ] Drive-time calculation — not started
+- [x] Drive-time calculation
 
 ### Task 22: Build Dispatch Module
 - [x] Assign job to technician
 - [x] Job status tracking (ASSIGNED → EN_ROUTE → STARTED → COMPLETED)
 - [x] List jobs by technician
-- [ ] Auto-assignment rules — not started
+- [x] Auto-assignment rules
 - [ ] Job offer system — not started
 
 ### Task 23: Build Invoice Module

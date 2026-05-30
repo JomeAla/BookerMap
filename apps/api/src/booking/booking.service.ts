@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebhookService } from '../webhook/webhook.service';
+import { PricingService } from '../pricing/pricing.service';
 import { SchedulingService } from './scheduling.service';
+import { DispatchService } from '../dispatch/dispatch.service';
+import { BookingGateway } from '../gateway/booking.gateway';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { RescheduleBookingDto } from './dto/reschedule-booking.dto';
 
@@ -12,7 +15,10 @@ export class BookingService {
   constructor(
     private prisma: PrismaService,
     private schedulingService: SchedulingService,
+    private dispatchService: DispatchService,
     private webhookService: WebhookService,
+    private pricingService: PricingService,
+    private bookingGateway: BookingGateway,
   ) {}
 
   async create(tenantId: string, dto: CreateBookingDto) {
@@ -42,6 +48,9 @@ export class BookingService {
       const selected = service.modifiers.filter(m => selectedModifiers.includes(m.id));
       totalPrice += selected.reduce((sum, m) => sum + m.price, 0);
     }
+
+    const pricingResult = await this.pricingService.applyPricing(tenantId, totalPrice, serviceId, start);
+    totalPrice = pricingResult.finalPrice;
 
     if (couponCode) {
       const coupon = await this.prisma.coupon.findUnique({
@@ -81,9 +90,26 @@ export class BookingService {
       include: { service: true, customer: true, technician: true, location: true },
     });
 
-    this.webhookService.dispatchEvent(tenantId, 'booking.created', { bookingId: booking.id, status: booking.status })
-      .catch(err => this.logger.error('Webhook dispatch failed', err));
+     this.webhookService.dispatchEvent(tenantId, 'booking.created', { bookingId: booking.id, status: booking.status })
+       .catch((err: Error) => this.logger.error('Webhook dispatch failed', err));
 
+      if (!technicianId) {
+        this.dispatchService.autoAssign(booking.id)
+          .catch((err: Error) => this.logger.error('Auto-assignment failed', err));
+      }
+    
+      // Notify via WebSocket
+      this.bookingGateway.notifyBookingCreated(tenantId, {
+        bookingId: booking.id,
+        serviceId: booking.serviceId,
+        customerId: booking.customerId,
+        technicianId: booking.technicianId,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        status: booking.status,
+        totalPrice: booking.totalPrice,
+      });
+    
     return booking;
   }
 
@@ -136,9 +162,16 @@ export class BookingService {
       data: { status: 'CANCELLED' },
       include: { service: true, customer: true, technician: true },
     });
-    this.webhookService.dispatchEvent(tenantId, 'booking.cancelled', { bookingId: id })
-      .catch(err => this.logger.error('Webhook dispatch failed', err));
-    return cancelled;
+     this.webhookService.dispatchEvent(tenantId, 'booking.cancelled', { bookingId: id })
+       .catch((err: Error) => this.logger.error('Webhook dispatch failed', err));
+     
+     // Notify via WebSocket
+     this.bookingGateway.notifyBookingCanceled(tenantId, {
+       bookingId: id,
+       status: 'CANCELLED',
+     });
+     
+     return cancelled;
   }
 
   async reschedule(tenantId: string, id: string, dto: RescheduleBookingDto) {
@@ -159,8 +192,15 @@ export class BookingService {
       data: { startTime: newStart, endTime: newEnd, status: 'PENDING' },
       include: { service: true, customer: true, technician: true },
     });
-    this.webhookService.dispatchEvent(tenantId, 'booking.rescheduled', { bookingId: id, newStartTime: dto.newStartTime })
-      .catch(err => this.logger.error('Webhook dispatch failed', err));
-    return rescheduled;
+     this.webhookService.dispatchEvent(tenantId, 'booking.rescheduled', { bookingId: id, newStartTime: dto.newStartTime })
+       .catch((err: Error) => this.logger.error('Webhook dispatch failed', err));
+     
+     // Notify via WebSocket
+     this.bookingGateway.notifyBookingUpdated(tenantId, {
+       bookingId: id,
+       newStartTime: dto.newStartTime,
+     });
+     
+     return rescheduled;
   }
 }

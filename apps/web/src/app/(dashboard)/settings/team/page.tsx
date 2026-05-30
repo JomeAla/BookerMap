@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
-import { Users, UserPlus, Shield, Clock, Send, X, Plus } from 'lucide-react'
+import { Users, UserPlus, Shield, Clock, Send, X, Plus, DollarSign } from 'lucide-react'
 import type { User, UserRole } from '@/types'
 
 const roleOptions = [
@@ -77,6 +77,34 @@ export default function TeamPage() {
   const [editingSkillsUser, setEditingSkillsUser] = React.useState<User | null>(null)
   const [skillsInput, setSkillsInput] = React.useState('')
   const [currentSkills, setCurrentSkills] = React.useState<string[]>([])
+
+  const [commissionDialogOpen, setCommissionDialogOpen] = React.useState(false)
+  const [editingCommissionUser, setEditingCommissionUser] = React.useState<User | null>(null)
+  const [commissionForm, setCommissionForm] = React.useState({ commissionRate: 0, commissionType: 'PERCENTAGE' })
+
+  const openCommissionDialog = (member: User) => {
+    setEditingCommissionUser(member)
+    setCommissionForm({
+      commissionRate: member.commissionRate ?? 0,
+      commissionType: member.commissionType ?? 'PERCENTAGE',
+    })
+    setCommissionDialogOpen(true)
+  }
+
+  const saveCommission = async () => {
+    if (!editingCommissionUser) return
+    try {
+      await api.patch(`/users/${editingCommissionUser.id}`, {
+        commissionRate: commissionForm.commissionRate || null,
+        commissionType: commissionForm.commissionType,
+      })
+      addToast('Commission settings updated', 'success')
+      setCommissionDialogOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['team'] })
+    } catch (err: any) {
+      addToast(err.response?.data?.message || 'Failed to update commission', 'error')
+    }
+  }
 
   const { data: allSkills } = useQuery({
     queryKey: ['all-skills'],
@@ -252,6 +280,36 @@ export default function TeamPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={commissionDialogOpen} onOpenChange={setCommissionDialogOpen}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Commission — {editingCommissionUser?.firstName} {editingCommissionUser?.lastName}</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <Input
+                label="Commission Rate"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={commissionForm.commissionRate}
+                onChange={(e) => setCommissionForm({ ...commissionForm, commissionRate: parseFloat(e.target.value) || 0 })}
+              />
+              <Select
+                label="Commission Type"
+                value={commissionForm.commissionType}
+                onChange={(e) => setCommissionForm({ ...commissionForm, commissionType: e.target.value })}
+                options={[
+                  { value: 'PERCENTAGE', label: 'Percentage (%)' },
+                  { value: 'FIXED', label: 'Fixed Amount' },
+                ]}
+              />
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={() => setCommissionDialogOpen(false)}>Cancel</Button>
+                <Button onClick={saveCommission}>Save</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card>
@@ -286,6 +344,7 @@ export default function TeamPage() {
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Skills</TableHead>
+                      <TableHead>Commission</TableHead>
                       <TableHead>Last Login</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -328,6 +387,19 @@ export default function TeamPage() {
                           <span className="text-sm text-gray-400">—</span>
                         )}
                       </TableCell>
+                      <TableCell className="text-sm">
+                        {member.role === 'TECHNICIAN' ? (
+                          member.commissionRate ? (
+                            <Badge variant="secondary" className="text-xs">
+                              {member.commissionType === 'FIXED' ? `$${member.commissionRate}` : `${member.commissionRate}%`}
+                            </Badge>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm text-gray-500">
                         {member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleDateString() : 'Never'}
                       </TableCell>
@@ -341,6 +413,9 @@ export default function TeamPage() {
                             </Link>
                             <Button variant="ghost" size="sm" onClick={() => openSkillsDialog(member)}>
                               <Plus className="h-3.5 w-3.5 mr-1" /> Skills
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => openCommissionDialog(member)}>
+                              <DollarSign className="h-3.5 w-3.5 mr-1" /> Commission
                             </Button>
                           </div>
                         )}

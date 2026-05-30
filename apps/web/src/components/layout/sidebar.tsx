@@ -21,6 +21,10 @@ import {
   Truck,
   Bot,
   CreditCard,
+  Package,
+  Megaphone,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
@@ -34,8 +38,10 @@ const navItems = [
   { href: '/invoices', label: 'Invoices', icon: FileText },
   { href: '/dispatches', label: 'Dispatches', icon: Truck },
   { href: '/notifications', label: 'Notifications', icon: Bell },
+  { href: '/inventory', label: 'Inventory', icon: Package },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/ai/history', label: 'AI History', icon: Bot },
+  { href: '/marketing', label: 'Marketing', icon: Megaphone },
   { href: '/settings/subscription', label: 'Subscription', icon: CreditCard },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]

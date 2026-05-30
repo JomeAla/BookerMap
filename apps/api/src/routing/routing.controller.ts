@@ -1,9 +1,12 @@
 import { Controller, Post, Body, UseGuards, Logger } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { RoutingService } from './routing.service';
 import { PrismaService } from '../prisma/prisma.service';
 
+@ApiTags('Routing')
+@ApiBearerAuth()
 @Controller('routing')
 @UseGuards(JwtAuthGuard)
 export class RoutingController {
@@ -15,6 +18,8 @@ export class RoutingController {
   ) {}
 
   @Post('optimize')
+  @ApiOperation({ summary: 'Optimize route', description: 'Optimize the order of dispatches for a technician using nearest-neighbor routing' })
+  @ApiResponse({ status: 200, description: 'Optimized route with ordered stops' })
   async optimizeRoute(
     @Body() body: { dispatchIds: string[]; technicianId?: string },
     @TenantId() tenantId: string,

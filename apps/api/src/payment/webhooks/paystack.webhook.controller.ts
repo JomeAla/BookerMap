@@ -1,8 +1,10 @@
 import { Controller, Post, Headers, Body, Logger, HttpException, HttpCode } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WebhookService } from '../../webhook/webhook.service';
 
+@ApiTags('Paystack Webhook')
 @Controller('payments/webhooks/paystack')
 export class PaystackWebhookController {
   private readonly logger = new Logger(PaystackWebhookController.name);
@@ -14,6 +16,9 @@ export class PaystackWebhookController {
 
   @Post()
   @HttpCode(200)
+  @ApiOperation({ summary: 'Paystack webhook handler', description: 'Handle incoming Paystack payment webhooks' })
+  @ApiResponse({ status: 200, description: 'Webhook processed' })
+  @ApiResponse({ status: 401, description: 'Invalid signature' })
   async handleWebhook(
     @Headers('x-paystack-signature') signature: string,
     @Body() payload: any,

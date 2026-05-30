@@ -11,10 +11,10 @@ import { StatusBadge, Badge } from '@/components/ui/badge'
 import { PageLoader } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowLeft, User, Phone, Mail, Clock, Wrench, DollarSign, MapPin, Star } from 'lucide-react'
+import { ArrowLeft, User, Phone, Mail, Clock, Wrench, DollarSign, MapPin, Star, Package, Plus, Upload, Trash2, FileIcon } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import type { Booking, Dispatch, Review } from '@/types'
+import type { Booking, Dispatch, Review, BookingInventory, InventoryItem, BookingFile } from '@/types'
 
 export default function BookingDetailPage() {
   const params = useParams()
@@ -184,8 +184,135 @@ export default function BookingDetailPage() {
       </Card>
 
       <PosPaymentSection booking={booking} />
+      <MaterialsSection bookingId={booking.id} />
+      <FilesSection bookingId={booking.id} />
       <ReviewSection booking={booking} />
     </div>
+  )
+}
+
+function MaterialsSection({ bookingId }: { bookingId: string }) {
+  const queryClient = useQueryClient()
+  const { addToast } = useToast()
+  const [dialogOpen, setDialogOpen] = React.useState(false)
+  const [selectedItemId, setSelectedItemId] = React.useState('')
+  const [usageQuantity, setUsageQuantity] = React.useState(1)
+
+  const { data: usage, isLoading: usageLoading } = useQuery({
+    queryKey: ['booking-inventory', bookingId],
+    queryFn: async () => {
+      const { data } = await api.get(`/inventory/usage/${bookingId}`)
+      return data.data as (BookingInventory & { item: InventoryItem })[]
+    },
+  })
+
+  const { data: inventoryItems } = useQuery({
+    queryKey: ['inventory-all'],
+    queryFn: async () => {
+      const { data } = await api.get('/inventory')
+      return data.data as InventoryItem[]
+    },
+    enabled: dialogOpen,
+  })
+
+  const logUsageMutation = useMutation({
+    mutationFn: async (body: { bookingId: string; itemId: string; quantity: number }) => {
+      const { data } = await api.post('/inventory/usage', body)
+      return data.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['booking-inventory', bookingId] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      setDialogOpen(false)
+      setSelectedItemId('')
+      setUsageQuantity(1)
+      addToast('Material usage logged', 'success')
+    },
+    onError: (err: any) => addToast(err.response?.data?.message || 'Failed to log usage', 'error'),
+  })
+
+  const handleAddMaterial = () => {
+    if (!selectedItemId || usageQuantity < 1) return
+    logUsageMutation.mutate({ bookingId, itemId: selectedItemId, quantity: usageQuantity })
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Package className="h-4 w-4 text-gray-400" />
+            Materials Used
+          </CardTitle>
+          <Button size="sm" variant="secondary" onClick={() => setDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add Material
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {usageLoading ? (
+            <p className="text-sm text-gray-500">Loading...</p>
+          ) : !usage || usage.length === 0 ? (
+            <p className="text-sm text-gray-500">No materials logged for this booking yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {usage.map((u) => (
+                <div key={u.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Package className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <p className="text-sm font-medium">{u.item?.name || 'Unknown item'}</p>
+                      <p className="text-xs text-gray-500">{u.quantityUsed} {u.item?.unit}(s) used</p>
+                    </div>
+                  </div>
+                  <span className="text-sm font-mono text-gray-500">
+                    {formatCurrency((u.unitCostAtTime * u.quantityUsed) / 100)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Add Material</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Item</label>
+              <select
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                value={selectedItemId}
+                onChange={(e) => setSelectedItemId(e.target.value)}
+              >
+                <option value="">Select item...</option>
+                {inventoryItems?.filter((i) => i.quantity > 0).map((item) => (
+                  <option key={item.id} value={item.id} disabled={item.quantity <= 0}>
+                    {item.name} ({item.quantity} {item.unit} available)
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Quantity</label>
+              <Input
+                type="number"
+                min="1"
+                value={usageQuantity}
+                onChange={(e) => setUsageQuantity(parseInt(e.target.value) || 1)}
+              />
+            </div>
+            <Button
+              className="w-full"
+              onClick={handleAddMaterial}
+              disabled={!selectedItemId || logUsageMutation.isPending}
+            >
+              {logUsageMutation.isPending ? 'Adding...' : 'Add Material'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -286,6 +413,184 @@ function PosPaymentSection({ booking }: { booking: Booking }) {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  photo: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  document: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  before: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  after: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  other: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400',
+}
+
+function FilesSection({ bookingId }: { bookingId: string }) {
+  const queryClient = useQueryClient()
+  const { addToast } = useToast()
+  const [uploadDialogOpen, setUploadDialogOpen] = React.useState(false)
+  const [uploading, setUploading] = React.useState(false)
+
+  const { data: files, isLoading } = useQuery({
+    queryKey: ['booking-files', bookingId],
+    queryFn: async () => {
+      const { data } = await api.get(`/files/booking/${bookingId}`)
+      return data.data as BookingFile[]
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: async (fileId: string) => {
+      await api.delete(`/files/${fileId}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['booking-files', bookingId] })
+      addToast('File deleted', 'success')
+    },
+    onError: () => addToast('Failed to delete file', 'error'),
+  })
+
+  const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const form = e.currentTarget
+    const fileInput = form.elements.namedItem('file') as HTMLInputElement
+    const categoryInput = form.elements.namedItem('category') as HTMLSelectElement
+    const file = fileInput.files?.[0]
+    if (!file) return
+
+    if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type)) {
+      addToast('File type not supported. Use JPEG, PNG, WebP, or PDF.', 'error')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      addToast('File too large. Maximum 10MB.', 'error')
+      return
+    }
+
+    setUploading(true)
+    try {
+      const reader = new FileReader()
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+
+      await api.post('/files/upload', {
+        bookingId,
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        data: base64,
+        category: categoryInput.value,
+      })
+
+      queryClient.invalidateQueries({ queryKey: ['booking-files', bookingId] })
+      setUploadDialogOpen(false)
+      addToast('File uploaded', 'success')
+    } catch {
+      addToast('Failed to upload file', 'error')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileIcon className="h-4 w-4 text-gray-400" />
+            Files & Photos
+          </CardTitle>
+          <Button size="sm" variant="secondary" onClick={() => setUploadDialogOpen(true)}>
+            <Upload className="h-4 w-4 mr-1" /> Upload File
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <p className="text-sm text-gray-500">Loading...</p>
+          ) : !files || files.length === 0 ? (
+            <p className="text-sm text-gray-500">No files attached to this booking yet.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {files.map((file) => (
+                <div key={file.id} className="group relative bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                  {file.fileType.startsWith('image/') ? (
+                    <div className="aspect-square bg-gray-100 dark:bg-gray-900">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={file.data}
+                        alt={file.fileName}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="aspect-square flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+                      <FileIcon className="h-10 w-10 text-gray-400" />
+                    </div>
+                  )}
+                  <div className="p-2 space-y-1">
+                    <p className="text-xs font-medium truncate" title={file.fileName}>{file.fileName}</p>
+                    <div className="flex items-center gap-1">
+                      <Badge className={`text-[10px] px-1.5 py-0 ${CATEGORY_COLORS[file.category] || CATEGORY_COLORS.other}`}>
+                        {file.category}
+                      </Badge>
+                      <span className="text-[10px] text-gray-400">{formatFileSize(file.fileSize)}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="absolute top-1 right-1 p-1 bg-white/80 dark:bg-gray-900/80 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 dark:hover:bg-red-900/50"
+                    onClick={() => {
+                      if (confirm('Delete this file?')) {
+                        deleteMutation.mutate(file.id)
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Upload File</DialogTitle></DialogHeader>
+          <form onSubmit={handleUpload} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">File</label>
+              <Input type="file" name="file" accept="image/jpeg,image/png,image/webp,application/pdf" required />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Category</label>
+              <select
+                name="category"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                defaultValue="photo"
+              >
+                <option value="photo">Photo</option>
+                <option value="before">Before</option>
+                <option value="after">After</option>
+                <option value="document">Document</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <Button className="w-full" type="submit" disabled={uploading}>
+              {uploading ? 'Uploading...' : 'Upload'}
+            </Button>
+          </form>
         </DialogContent>
       </Dialog>
     </>

@@ -79,6 +79,8 @@ export interface User {
   isActive: boolean
   availability?: Record<string, Array<{ start: string; end: string }>> | null
   skills?: string[] | null
+  commissionRate?: number | null
+  commissionType?: string | null
   avatarUrl?: string | null
   lastLoginAt?: string | null
   createdAt: string
@@ -338,6 +340,7 @@ export interface Notification {
 
 export interface Webhook {
   id: string
+  name: string
   url: string
   events: string[]
   secret: string | null
@@ -404,6 +407,46 @@ export interface Terminal {
   terminalId: string
   name: string
   status: string
+}
+
+export interface InventoryItem {
+  id: string
+  tenantId: string
+  name: string
+  description?: string | null
+  sku?: string | null
+  category?: string | null
+  unit: string
+  unitCost: number
+  quantity: number
+  lowStockThreshold: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BookingInventory {
+  id: string
+  tenantId: string
+  bookingId: string
+  itemId: string
+  quantityUsed: number
+  unitCostAtTime: number
+  createdAt: string
+  item?: InventoryItem
+  booking?: Booking
+}
+
+export interface BookingFile {
+  id: string
+  bookingId: string
+  fileName: string
+  fileType: string
+  fileSize: number
+  category: string
+  data: string
+  uploadedBy?: string | null
+  createdAt: string
 }
 
 export interface AiResponse {

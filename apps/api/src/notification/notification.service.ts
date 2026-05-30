@@ -2,16 +2,31 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationType } from '@prisma/client';
 import { NotificationFilterDto } from './dto/notification-filter.dto';
+import { BookingGateway } from '../gateway/booking.gateway';
 
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private bookingGateway: BookingGateway) {}
 
-  async sendEmail(tenantId: string, recipient: string, subject: string, body: string, html?: string) {
-    return this.createNotification(tenantId, NotificationType.EMAIL, 'EMAIL', recipient, subject, body);
-  }
+   async sendEmail(tenantId: string, recipient: string, subject: string, body: string, html?: string) {
+     const notification = await this.createNotification(tenantId, NotificationType.EMAIL, 'EMAIL', recipient, subject, body);
+     
+     // Notify via WebSocket
+     this.bookingGateway.notifyNewNotification(tenantId, {
+       notificationId: notification.id,
+       type: notification.type,
+       channel: notification.channel,
+       recipient: notification.recipient,
+       subject: notification.subject,
+       body: notification.body,
+       status: notification.status,
+       createdAt: notification.createdAt,
+     });
+     
+     return notification;
+   }
 
   async sendSms(tenantId: string, recipient: string, message: string) {
     return this.createNotification(tenantId, NotificationType.SMS, 'SMS', recipient, null, message);

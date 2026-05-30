@@ -1,6 +1,7 @@
 import {
   Controller, Get, Post, Put, Delete, Param, Body, UseGuards, HttpException, Logger,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { PrismaService } from '../prisma/prisma.service';
@@ -10,6 +11,8 @@ import { WhatsAppSettingsDto } from '../notification/dto/whatsapp-settings.dto';
 import { encrypt, decrypt } from './helpers/crypto.helper';
 import axios from 'axios';
 
+@ApiTags('Payment Settings')
+@ApiBearerAuth()
 @Controller('payments/settings')
 @UseGuards(JwtAuthGuard)
 export class PaymentSettingsController {
@@ -18,6 +21,8 @@ export class PaymentSettingsController {
   constructor(private prisma: PrismaService) {}
 
   @Get()
+  @ApiOperation({ summary: 'Get payment settings', description: 'Get all payment provider settings for the tenant' })
+  @ApiResponse({ status: 200, description: 'Payment settings' })
   async getSettings(@TenantId() tenantId: string) {
     const settings = await this.prisma.paymentSettings.findMany({
       where: { tenantId },
@@ -38,6 +43,8 @@ export class PaymentSettingsController {
   }
 
   @Post('paystack')
+  @ApiOperation({ summary: 'Save Paystack settings', description: 'Save or update Paystack payment provider settings' })
+  @ApiResponse({ status: 200, description: 'Paystack settings saved' })
   async savePaystack(@Body() dto: PaystackSettingsDto, @TenantId() tenantId: string) {
     const data: any = { provider: 'PAYSTACK', tenantId };
     if (dto.publicKey) data.publicKey = dto.publicKey;
@@ -57,6 +64,8 @@ export class PaymentSettingsController {
   }
 
   @Post('flutterwave')
+  @ApiOperation({ summary: 'Save Flutterwave settings', description: 'Save or update Flutterwave payment provider settings' })
+  @ApiResponse({ status: 200, description: 'Flutterwave settings saved' })
   async saveFlutterwave(@Body() dto: FlutterwaveSettingsDto, @TenantId() tenantId: string) {
     const data: any = { provider: 'FLUTTERWAVE', tenantId };
     if (dto.publicKey) data.publicKey = dto.publicKey;
@@ -76,6 +85,8 @@ export class PaymentSettingsController {
   }
 
   @Post('whatsapp')
+  @ApiOperation({ summary: 'Save WhatsApp settings', description: 'Save or update WhatsApp notification settings' })
+  @ApiResponse({ status: 200, description: 'WhatsApp settings saved' })
   async saveWhatsApp(@Body() dto: WhatsAppSettingsDto, @TenantId() tenantId: string) {
     const provider = 'WHATSAPP';
 
@@ -111,6 +122,10 @@ export class PaymentSettingsController {
   }
 
   @Post('validate')
+  @ApiOperation({ summary: 'Validate payment settings', description: 'Validate payment provider connection by testing API keys' })
+  @ApiResponse({ status: 200, description: 'Validation result' })
+  @ApiResponse({ status: 404, description: 'Settings not found' })
+  @ApiResponse({ status: 502, description: 'Connection failed' })
   async validate(
     @Body() body: { provider: 'PAYSTACK' | 'FLUTTERWAVE' },
     @TenantId() tenantId: string,
@@ -143,6 +158,9 @@ export class PaymentSettingsController {
   }
 
   @Put()
+  @ApiOperation({ summary: 'Update payment settings', description: 'Update payment provider settings' })
+  @ApiResponse({ status: 200, description: 'Settings updated' })
+  @ApiResponse({ status: 400, description: 'Provider is required' })
   async updateSettings(@Body() body: any, @TenantId() tenantId: string) {
     const { provider, ...updates } = body;
     if (!provider) throw new HttpException('Provider is required', 400);
@@ -164,6 +182,10 @@ export class PaymentSettingsController {
   }
 
   @Delete(':provider')
+  @ApiOperation({ summary: 'Remove payment provider', description: 'Delete payment provider settings' })
+  @ApiParam({ name: 'provider', type: String, description: 'Provider name (PAYSTACK, FLUTTERWAVE, WHATSAPP)' })
+  @ApiResponse({ status: 200, description: 'Provider settings removed' })
+  @ApiResponse({ status: 400, description: 'Invalid provider' })
   async removeProvider(@Param('provider') provider: string, @TenantId() tenantId: string) {
     if (!['PAYSTACK', 'FLUTTERWAVE', 'WHATSAPP'].includes(provider)) {
       throw new HttpException('Invalid provider', 400);

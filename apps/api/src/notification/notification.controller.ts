@@ -12,7 +12,7 @@ import {
   HttpException,
   Req,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiExcludeEndpoint } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiExcludeEndpoint } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -35,6 +35,7 @@ export class NotificationController {
   @ApiBearerAuth()
   @Get()
   @ApiOperation({ summary: 'List user notifications' })
+  @ApiResponse({ status: 200, description: 'List of notifications' })
   async findAll(
     @CurrentUser() user: { id: string; tenantId: string },
     @Query() filters: NotificationFilterDto,
@@ -46,6 +47,7 @@ export class NotificationController {
   @ApiBearerAuth()
   @Get('unread-count')
   @ApiOperation({ summary: 'Get unread notification count' })
+  @ApiResponse({ status: 200, description: 'Unread count' })
   async unreadCount(@CurrentUser() user: { id: string; tenantId: string }) {
     return this.notificationService.getUnreadCount(user.id, user.tenantId);
   }
@@ -54,6 +56,8 @@ export class NotificationController {
   @ApiBearerAuth()
   @Patch(':id/read')
   @ApiOperation({ summary: 'Mark notification as read' })
+  @ApiResponse({ status: 200, description: 'Notification marked as read' })
+  @ApiResponse({ status: 404, description: 'Notification not found' })
   async markAsRead(@Param('id') id: string) {
     return this.notificationService.markAsRead(id);
   }
@@ -62,6 +66,7 @@ export class NotificationController {
   @ApiBearerAuth()
   @Post('test-email')
   @ApiOperation({ summary: 'Test email configuration' })
+  @ApiResponse({ status: 200, description: 'Test email sent' })
   async testEmail(
     @CurrentUser() user: { id: string; tenantId: string },
     @Body() body: { recipient: string; subject: string; message: string },
@@ -73,6 +78,7 @@ export class NotificationController {
   @ApiBearerAuth()
   @Post('send-team')
   @ApiOperation({ summary: 'Send notification to team members' })
+  @ApiResponse({ status: 200, description: 'Team notification sent' })
   async sendTeam(
     @CurrentUser() user: { id: string; tenantId: string },
     @Body() dto: SendTeamNotificationDto,
@@ -84,6 +90,7 @@ export class NotificationController {
   @ApiBearerAuth()
   @Post('test-sms')
   @ApiOperation({ summary: 'Test SMS configuration' })
+  @ApiResponse({ status: 200, description: 'Test SMS sent' })
   async testSms(
     @CurrentUser() user: { id: string; tenantId: string },
     @Body() body: { recipient: string; message: string },

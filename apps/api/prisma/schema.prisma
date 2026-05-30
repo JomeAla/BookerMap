@@ -56,6 +56,12 @@ enum NotificationType {
   WHATSAPP
 }
 
+enum PricingRuleType {
+  SURGE
+  OFF_PEAK
+  PROMO
+}
+
 enum ReviewStatus {
   PENDING
   APPROVED
@@ -121,6 +127,8 @@ model Tenant {
   recurringBookings  RecurringBooking[]
   locations          Location[]
   reviews            Review[]
+  inventoryItems     InventoryItem[]
+  bookingInventory   BookingInventory[]
   subscription       Subscription?
 
   @@map("tenants")
@@ -202,6 +210,8 @@ model User {
   refreshTokens    RefreshToken[]
   notifications    Notification[]
   googleCalendarToken GoogleCalendarToken?
+  commissionRate      Float?
+  commissionType      String?   @default("PERCENTAGE")
 
   @@unique([tenantId, email])
   @@map("users")
@@ -368,8 +378,10 @@ model Booking {
   invoices     Invoice[]
   dispatch     Dispatch?
   reviews      Review[]
-  recurrenceId String?
-  recurrence   RecurringBooking? @relation(fields: [recurrenceId], references: [id])
+  recurrenceId   String?
+  recurrence     RecurringBooking? @relation(fields: [recurrenceId], references: [id])
+  inventoryUsage BookingInventory[]
+  files        BookingFile[]
 
   @@map("bookings")
 }
@@ -553,6 +565,27 @@ model Coupon {
   @@map("coupons")
 }
 
+model PricingRule {
+  id          String           @id @default(cuid())
+  tenantId    String
+  name        String
+  type        PricingRuleType
+  priority    Int              @default(0)
+  serviceId   String?
+  daysOfWeek  Json?
+  startTime   String?
+  endTime     String?
+  minHoursBeforeBooking Int?
+  adjustmentType String       @default("PERCENTAGE")
+  adjustmentValue Float
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([tenantId])
+  @@map("pricing_rules")
+}
+
 model SavedCard {
   id            String   @id @default(cuid())
   tenantId      String
@@ -671,6 +704,43 @@ model GoogleCalendarToken {
   @@map("google_calendar_tokens")
 }
 
+model Campaign {
+  id              String       @id @default(cuid())
+  tenantId        String
+  name            String
+  subject         String
+  body            String
+  triggerDays     Int
+  triggerType     String       @default("LAPSED")
+  discountPercent Int?
+  isActive        Boolean      @default(true)
+  lastSentAt      DateTime?
+  sentCount       Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  logs CampaignLog[]
+
+  @@index([tenantId])
+  @@map("campaigns")
+}
+
+model CampaignLog {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  tenantId    String
+  customerId  String?
+  email       String
+  sentAt      DateTime @default(now())
+  openedAt    DateTime?
+  clickedAt   DateTime?
+
+  @@index([tenantId])
+  @@index([campaignId])
+  @@map("campaign_logs")
+}
+
 model RefreshToken {
   id        String   @id @default(cuid())
   token     String   @unique
@@ -681,4 +751,61 @@ model RefreshToken {
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
+}
+
+model InventoryItem {
+  id                String   @id @default(cuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  sku               String?
+  category          String?
+  unit              String   @default("piece")
+  unitCost          Int      @default(0)
+  quantity          Int      @default(0)
+  lowStockThreshold Int      @default(5)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  bookingUsage BookingInventory[]
+
+  @@index([tenantId])
+  @@map("inventory_items")
+}
+
+model BookingInventory {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookingId      String
+  booking        Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  itemId         String
+  item           InventoryItem @relation(fields: [itemId], references: [id])
+  quantityUsed   Int           @default(1)
+  unitCostAtTime Int           @default(0)
+  createdAt      DateTime      @default(now())
+
+  @@index([tenantId])
+  @@index([bookingId])
+  @@map("booking_inventory")
+}
+
+model BookingFile {
+  id          String   @id @default(cuid())
+  tenantId    String
+  bookingId   String
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fileName    String
+  fileType    String
+  fileSize    Int
+  category    String   @default("photo")
+  data        String
+  uploadedBy  String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([bookingId])
+  @@map("booking_files")
 }

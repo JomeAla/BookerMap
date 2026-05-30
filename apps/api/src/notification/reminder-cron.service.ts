@@ -5,6 +5,7 @@ import { EmailService } from './email.service';
 import { SmsService } from './sms.service';
 import { WhatsAppService } from './whatsapp.service';
 import { NotificationService } from './notification.service';
+import { MarketingService } from '../marketing/marketing.service';
 
 @Injectable()
 export class ReminderCronService {
@@ -16,7 +17,18 @@ export class ReminderCronService {
     private smsService: SmsService,
     private whatsAppService: WhatsAppService,
     private notificationService: NotificationService,
+    private marketingService: MarketingService,
   ) {}
+
+  @Cron('0 9 * * 1')
+  async sendMarketingCampaigns() {
+    this.logger.log('Running weekly marketing campaigns...');
+    const results = await this.marketingService.processAllActiveCampaigns();
+    for (const r of results) {
+      this.logger.log(`Campaign "${r.name}": sent ${r.sent}/${r.total}`);
+    }
+    this.logger.log('Marketing campaigns completed');
+  }
 
   @Cron('0 6 * * *')
   async checkSubscriptionExpirations() {
