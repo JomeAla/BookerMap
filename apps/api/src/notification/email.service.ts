@@ -102,6 +102,13 @@ export class EmailService {
     await this.sendMail({ to: customerEmail, subject, text, html });
   }
 
+  async sendInvoiceReminder(customerEmail: string, details: { invoiceNumber: string; customerName: string; amount: number; dueDate: Date; invoiceId: string }): Promise<void> {
+    const subject = `Reminder: Invoice ${details.invoiceNumber} is due`;
+    const text = `Hi ${details.customerName},\n\nThis is a reminder that Invoice ${details.invoiceNumber} for $${details.amount.toFixed(2)} was due on ${details.dueDate.toLocaleDateString()}.\n\nPlease make your payment as soon as possible to avoid any late fees.\n\nThank you for your business.`;
+    const html = `<!DOCTYPE html><html><head><style>body{font-family:Arial,sans-serif;color:#333}.header{background:#EF4444;color:#fff;padding:20px;text-align:center}.content{padding:20px}.footer{padding:20px;font-size:12px;color:#666;text-align:center;border-top:1px solid #eee}</style></head><body><div class="header"><h2>Payment Reminder</h2></div><div class="content"><p>Hi <strong>${details.customerName}</strong>,</p><p>This is a reminder that Invoice <strong>${details.invoiceNumber}</strong> for <strong>$${details.amount.toFixed(2)}</strong> was due on <strong>${details.dueDate.toLocaleDateString()}</strong>.</p><p>Please make your payment as soon as possible to avoid any late fees.</p></div><div class="footer"><p>Thank you for your business!</p></div></body></html>`;
+    await this.sendMail({ to: customerEmail, subject, text, html });
+  }
+
   async sendFeedbackRequest(customerEmail: string, details: { customerName: string; serviceName: string; bookingId: string }): Promise<void> {
     const subject = `How was your ${details.serviceName} experience?`;
     const text = `Hi ${details.customerName},\n\nWe'd love to hear about your recent ${details.serviceName} experience. Please take a moment to leave a review.\n\nThank you!`;

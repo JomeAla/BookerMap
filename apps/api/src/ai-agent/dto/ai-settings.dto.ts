@@ -11,7 +11,7 @@ export class AiSettingsDto {
 
   @IsOptional()
   @IsObject()
-  businessHours?: Record<string, any>;
+  businessHours?: Record<string, { open: string; close: string } | null>;
 
   @IsOptional()
   @IsArray()

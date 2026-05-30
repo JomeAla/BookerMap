@@ -103,4 +103,76 @@ export class ReminderCronService {
 
     this.logger.log('Booking reminder cron completed');
   }
+
+  @Cron('0 8 * * *')
+  async sendPaymentReminders() {
+    this.logger.log('Running payment reminder cron...');
+
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        status: { in: ['SENT', 'OVERDUE'] },
+        dueDate: { lte: now },
+      },
+      include: {
+        customer: true,
+        tenant: true,
+      },
+    });
+
+    this.logger.log(`Found ${invoices.length} unpaid invoices needing reminders`);
+
+    for (const invoice of invoices) {
+      try {
+        const reminderKey = `reminder:invoice:${invoice.id}`;
+
+        const alreadySent = await this.prisma.notification.findFirst({
+          where: {
+            tenantId: invoice.tenantId,
+            status: { in: ['SENT', 'PENDING'] },
+            body: { contains: reminderKey },
+            createdAt: { gte: twentyFourHoursAgo },
+          },
+        });
+
+        if (alreadySent) {
+          this.logger.debug(`Payment reminder already sent for invoice ${invoice.id}`);
+          continue;
+        }
+
+        const customer = invoice.customer;
+        const customerName = `${customer.firstName} ${customer.lastName}`;
+
+        if (customer.email) {
+          await this.emailService.sendInvoiceReminder(customer.email, {
+            invoiceNumber: invoice.invoiceNumber,
+            customerName,
+            amount: invoice.total,
+            dueDate: invoice.dueDate,
+            invoiceId: invoice.id,
+          });
+        }
+
+        await this.notificationService.createNotification(
+          invoice.tenantId,
+          'EMAIL' as any,
+          'EMAIL',
+          customer.email || 'unknown',
+          `Payment Reminder: Invoice ${invoice.invoiceNumber}`,
+          reminderKey,
+        );
+
+        this.logger.log(`Payment reminder sent for invoice ${invoice.id} (${customerName})`);
+      } catch (error) {
+        this.logger.error(
+          `Failed to send payment reminder for invoice ${invoice.id}`,
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
+
+    this.logger.log('Payment reminder cron completed');
+  }
 }

@@ -11,9 +11,11 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { StatusBadge } from '@/components/ui/badge'
 import { PageLoader } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowLeft, User, Mail, Calendar, DollarSign, FileText, Send, CheckCircle, Ban, Download } from 'lucide-react'
-import type { Invoice } from '@/types'
+import { ArrowLeft, User, Mail, Calendar, DollarSign, FileText, Send, CheckCircle, Ban, Download, RotateCcw } from 'lucide-react'
+import type { Invoice, Payment } from '@/types'
 
 export default function InvoiceDetailPage() {
   const params = useParams()
@@ -52,6 +54,52 @@ export default function InvoiceDetailPage() {
     },
     onError: () => addToast('Failed to mark as paid', 'error'),
   })
+
+  const [refundDialogOpen, setRefundDialogOpen] = React.useState(false)
+  const [selectedPayment, setSelectedPayment] = React.useState<Payment | null>(null)
+  const [refundAmount, setRefundAmount] = React.useState('')
+  const [refundReason, setRefundReason] = React.useState('')
+  const [refundError, setRefundError] = React.useState('')
+
+  const refundMutation = useMutation({
+    mutationFn: async ({ paymentId, amount }: { paymentId: string; amount: number }) => {
+      const { data } = await api.post('/payments/refund', { paymentId, amount })
+      return data.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      addToast('Refund processed successfully', 'success')
+      setRefundDialogOpen(false)
+      setSelectedPayment(null)
+      setRefundAmount('')
+      setRefundReason('')
+      setRefundError('')
+    },
+    onError: () => addToast('Failed to process refund', 'error'),
+  })
+
+  function openRefundDialog(payment: Payment) {
+    setSelectedPayment(payment)
+    setRefundAmount(String(payment.amount))
+    setRefundReason('')
+    setRefundError('')
+    setRefundDialogOpen(true)
+  }
+
+  function handleRefundSubmit() {
+    if (!selectedPayment) return
+    const amount = Number(refundAmount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setRefundError('Amount must be greater than 0')
+      return
+    }
+    if (amount > selectedPayment.amount) {
+      setRefundError('Amount cannot exceed payment amount')
+      return
+    }
+    setRefundError('')
+    refundMutation.mutate({ paymentId: selectedPayment.id, amount })
+  }
 
   if (isLoading) return <PageLoader />
   if (!invoice) return <div className="text-center py-12 text-gray-500">Invoice not found</div>
@@ -211,6 +259,7 @@ export default function InvoiceDetailPage() {
                   <TableHead>Provider</TableHead>
                   <TableHead>Reference</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -221,6 +270,16 @@ export default function InvoiceDetailPage() {
                     <TableCell className="text-sm">{payment.provider}</TableCell>
                     <TableCell className="text-sm font-mono">{payment.providerRef || '—'}</TableCell>
                     <TableCell><StatusBadge status={payment.status} /></TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={payment.status !== 'SUCCESS'}
+                        onClick={() => openRefundDialog(payment)}
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 mr-1" /> Refund
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -228,6 +287,43 @@ export default function InvoiceDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Process Refund</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            {selectedPayment && (
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Payment amount: <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(selectedPayment.amount)}</span>
+              </div>
+            )}
+            <Input
+              label="Refund Amount"
+              type="number"
+              value={refundAmount}
+              onChange={(e) => { setRefundAmount(e.target.value); setRefundError('') }}
+              error={refundError}
+            />
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Reason (optional)</label>
+              <textarea
+                className="flex w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 min-h-[80px] resize-y"
+                placeholder="Enter reason for refund..."
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setRefundDialogOpen(false)} disabled={refundMutation.isPending}>
+                Cancel
+              </Button>
+              <Button onClick={handleRefundSubmit} disabled={refundMutation.isPending}>
+                {refundMutation.isPending ? 'Processing...' : 'Process Refund'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

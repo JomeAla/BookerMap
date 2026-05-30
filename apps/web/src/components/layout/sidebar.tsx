@@ -19,6 +19,7 @@ import {
   Building2,
   BarChart3,
   Truck,
+  Bot,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
@@ -33,6 +34,7 @@ const navItems = [
   { href: '/dispatches', label: 'Dispatches', icon: Truck },
   { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
+  { href: '/ai/history', label: 'AI History', icon: Bot },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
@@ -40,6 +42,19 @@ export function Sidebar() {
   const pathname = usePathname()
   const { user, logout } = useAuth()
   const [collapsed, setCollapsed] = React.useState(false)
+  const [dark, setDark] = React.useState(false)
+
+  React.useEffect(() => {
+    const isDark = document.documentElement.classList.contains('dark')
+    setDark(isDark)
+  }, [])
+
+  const toggleTheme = () => {
+    const next = !dark
+    setDark(next)
+    document.documentElement.classList.toggle('dark', next)
+    localStorage.setItem('theme', next ? 'dark' : 'light')
+  }
 
   return (
     <>
@@ -87,6 +102,15 @@ export function Sidebar() {
               {user.firstName} {user.lastName}
             </div>
           )}
+          <Button
+            variant="ghost"
+            size={collapsed ? 'icon' : 'default'}
+            className="w-full justify-start gap-3 text-gray-600 dark:text-gray-400"
+            onClick={toggleTheme}
+          >
+            {dark ? <Sun className="h-5 w-5 shrink-0" /> : <Moon className="h-5 w-5 shrink-0" />}
+            {!collapsed && <span>{dark ? 'Light' : 'Dark'} mode</span>}
+          </Button>
           <Button
             variant="ghost"
             size={collapsed ? 'icon' : 'default'}

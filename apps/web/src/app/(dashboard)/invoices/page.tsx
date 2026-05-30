@@ -18,13 +18,14 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { FileText, Plus, Trash2 } from 'lucide-react'
 import type { Invoice, Customer } from '@/types'
 
-const statusOptions = [
-  { value: '', label: 'All Statuses' },
+const statusTabs = [
+  { value: '', label: 'All' },
   { value: 'DRAFT', label: 'Draft' },
   { value: 'SENT', label: 'Sent' },
   { value: 'PAID', label: 'Paid' },
   { value: 'OVERDUE', label: 'Overdue' },
   { value: 'CANCELLED', label: 'Cancelled' },
+  { value: 'REFUNDED', label: 'Refunded' },
 ]
 
 interface LineItemEntry {
@@ -226,13 +227,20 @@ export default function InvoicesPage() {
 
       <Card>
         <CardContent className="p-4">
-          <div className="flex gap-3">
-            <Select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              options={statusOptions}
-              className="w-40"
-            />
+          <div className="flex gap-1 flex-wrap">
+            {statusTabs.map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => setStatusFilter(tab.value)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                  statusFilter === tab.value
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
         </CardContent>
       </Card>

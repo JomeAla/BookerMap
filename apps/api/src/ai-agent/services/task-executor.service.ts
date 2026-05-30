@@ -53,6 +53,13 @@ export class TaskExecutor {
       return { success: false, message: '', missingFields: missing };
     }
 
+    if (entities.date && entities.time) {
+      const hoursCheck = await this.isWithinBusinessHours(entities.date, entities.time, tenantId);
+      if (!hoursCheck.ok) {
+        return { success: false, message: hoursCheck.message! };
+      }
+    }
+
     try {
       const service = await this.prisma.service.findFirst({
         where: { tenantId, name: { contains: entities.service, mode: 'insensitive' }, isActive: true },
@@ -373,6 +380,61 @@ export class TaskExecutor {
     } catch (error) {
       return { success: false, message: 'Sorry, there was an error looking up the price. Please try again.' };
     }
+  }
+
+  private async isWithinBusinessHours(date: string, time: string, tenantId: string): Promise<{ ok: boolean; message?: string }> {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { aiSettings: true } });
+    const aiSettings = tenant?.aiSettings as Record<string, any> || {};
+    const businessHours = aiSettings.businessHours as Record<string, { open: string; close: string } | null> || {};
+
+    if (!businessHours || Object.keys(businessHours).length === 0) {
+      return { ok: true };
+    }
+
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dateObj = new Date(date + 'T12:00:00');
+    const dayName = dayNames[dateObj.getDay()];
+    const hours = businessHours[dayName];
+
+    if (!hours) {
+      const message = this.formatBusinessHoursMessage(businessHours);
+      return { ok: false, message };
+    }
+
+    const requestedMinutes = this.timeToMinutes(time);
+    const openMinutes = this.timeToMinutes(hours.open);
+    const closeMinutes = this.timeToMinutes(hours.close);
+
+    if (requestedMinutes < openMinutes || requestedMinutes >= closeMinutes) {
+      const message = this.formatBusinessHoursMessage(businessHours);
+      return { ok: false, message };
+    }
+
+    return { ok: true };
+  }
+
+  private timeToMinutes(time: string): number {
+    const parts = time.split(':');
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  }
+
+  private formatBusinessHoursMessage(businessHours: Record<string, { open: string; close: string } | null>): string {
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const lines: string[] = [];
+
+    for (const day of days) {
+      const h = businessHours[day];
+      if (h) {
+        const dayCap = day.charAt(0).toUpperCase() + day.slice(1);
+        lines.push(`${dayCap}: ${h.open} - ${h.close}`);
+      }
+    }
+
+    if (lines.length === 0) {
+      return "I'm sorry, we're currently closed. Please try again during business hours.";
+    }
+
+    return `I'm sorry, we're currently closed. Our business hours are:\n${lines.join('\n')}\n\nPlease try again during business hours.`;
   }
 
   private formatDate(date: Date | string): string {
