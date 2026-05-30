@@ -20,6 +20,7 @@ import {
   BarChart3,
   Truck,
   Bot,
+  CreditCard,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
@@ -35,6 +36,7 @@ const navItems = [
   { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/ai/history', label: 'AI History', icon: Bot },
+  { href: '/settings/subscription', label: 'Subscription', icon: CreditCard },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 

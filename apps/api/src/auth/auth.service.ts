@@ -91,6 +91,10 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
+    if (user.twoFactorEnabled) {
+      return { twoFactorRequired: true, userId: user.id };
+    }
+
     const tokens = await this.generateTokens(user.id, user.email, user.tenantId, user.role);
 
     return {
@@ -200,7 +204,31 @@ export class AuthService {
     return { message: 'Password reset successfully' };
   }
 
-  private async generateTokens(userId: string, email: string, tenantId: string, role: string) {
+  async findOrCreateOAuthUser(data: { email: string; firstName: string; lastName: string; picture: string | null; provider: string; providerId: string }) {
+    let user = await this.prisma.user.findUnique({ where: { email: data.email } });
+
+    if (user) {
+      const tokens = await this.generateTokens(user.id, user.email, user.tenantId, user.role);
+      return { ...user, ...tokens };
+    }
+
+    user = await this.prisma.user.create({
+      data: {
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: 'OWNER' as any,
+        passwordHash: '',
+        emailVerified: true,
+        tenantId: '',
+      },
+    });
+
+    const tokens = await this.generateTokens(user.id, user.email, user.tenantId, user.role);
+    return { ...user, ...tokens };
+  }
+
+  async generateTokens(userId: string, email: string, tenantId: string, role: string) {
     const payload = { sub: userId, email, tenantId, role };
 
     const accessToken = this.jwtService.sign(payload);

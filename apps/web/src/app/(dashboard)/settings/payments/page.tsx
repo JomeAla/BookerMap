@@ -9,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Spinner } from '@/components/ui/spinner'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/toast'
-import { CreditCard, CheckCircle, XCircle, Globe, Save, Loader2 } from 'lucide-react'
+import { CreditCard, CheckCircle, XCircle, Globe, Save, Loader2, MessageCircle } from 'lucide-react'
 import type { PaymentSettings } from '@/types'
 
 export default function PaymentSettingsPage() {
@@ -26,9 +26,11 @@ export default function PaymentSettingsPage() {
 
   const paystackSettings = settings?.find((s) => s.provider === 'PAYSTACK')
   const flutterwaveSettings = settings?.find((s) => s.provider === 'FLUTTERWAVE')
+  const whatsappSettings = settings?.find((s) => s.provider === 'WHATSAPP')
 
   const [paystackForm, setPaystackForm] = React.useState({ publicKey: '', secretKey: '' })
   const [flutterwaveForm, setFlutterwaveForm] = React.useState({ publicKey: '', secretKey: '', encryptionKey: '' })
+  const [whatsappForm, setWhatsappForm] = React.useState({ whatsappPhoneNumberId: '', whatsappBusinessAccountId: '', whatsappAccessToken: '' })
 
   React.useEffect(() => {
     if (paystackSettings) {
@@ -37,7 +39,14 @@ export default function PaymentSettingsPage() {
     if (flutterwaveSettings) {
       setFlutterwaveForm({ publicKey: flutterwaveSettings.publicKey, secretKey: '', encryptionKey: '' })
     }
-  }, [paystackSettings, flutterwaveSettings])
+    if (whatsappSettings) {
+      setWhatsappForm({
+        whatsappPhoneNumberId: whatsappSettings.whatsappPhoneNumberId || '',
+        whatsappBusinessAccountId: whatsappSettings.whatsappBusinessAccountId || '',
+        whatsappAccessToken: '',
+      })
+    }
+  }, [paystackSettings, flutterwaveSettings, whatsappSettings])
 
   const savePaystack = useMutation({
     mutationFn: async () => {
@@ -64,6 +73,20 @@ export default function PaymentSettingsPage() {
     },
     onError: (err: any) => {
       addToast(err.response?.data?.message || 'Failed to save Flutterwave settings', 'error')
+    },
+  })
+
+  const saveWhatsApp = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post('/payments/settings/whatsapp', whatsappForm)
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payment-settings'] })
+      addToast('WhatsApp settings saved', 'success')
+    },
+    onError: (err: any) => {
+      addToast(err.response?.data?.message || 'Failed to save WhatsApp settings', 'error')
     },
   })
 
@@ -241,6 +264,60 @@ export default function PaymentSettingsPage() {
               </Button>
               <Button type="submit" disabled={saveFlutterwave.isPending}>
                 {saveFlutterwave.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                Save
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-green-600" />
+              <CardTitle className="text-base">WhatsApp Business</CardTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              {whatsappSettings && (
+                <Badge variant={whatsappSettings.isActive ? 'success' : 'secondary'}>
+                  {whatsappSettings.isActive ? 'Active' : 'Inactive'}
+                </Badge>
+              )}
+            </div>
+          </div>
+          <CardDescription>Configure WhatsApp Business API for booking notifications</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              saveWhatsApp.mutate()
+            }}
+            className="space-y-4 max-w-lg"
+          >
+            <Input
+              label="Phone Number ID"
+              placeholder="123456789012345"
+              value={whatsappForm.whatsappPhoneNumberId}
+              onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappPhoneNumberId: e.target.value })}
+            />
+            <Input
+              label="Business Account ID"
+              placeholder="123456789012345"
+              value={whatsappForm.whatsappBusinessAccountId}
+              onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappBusinessAccountId: e.target.value })}
+            />
+            <Input
+              label="Access Token"
+              type="password"
+              placeholder={whatsappSettings ? '•••••••• (leave blank to keep current)' : 'EAAx...'}
+              value={whatsappForm.whatsappAccessToken}
+              onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappAccessToken: e.target.value })}
+            />
+            <div className="flex gap-3">
+              <Button type="submit" disabled={saveWhatsApp.isPending}>
+                {saveWhatsApp.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
                 Save
               </Button>
             </div>

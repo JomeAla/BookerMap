@@ -85,7 +85,7 @@
 - [x] CRUD operations
 - [x] Address management
 - [x] Search/filter
-- [ ] Import/export — not started
+- [x] Import/export
 
 ### Task 18: Build Service Module
 - [x] CRUD services
@@ -187,19 +187,19 @@
 - [x] Refund in PaystackService
 - [x] Refund in FlutterwaveService
 - [x] POST /payments/refund endpoint
-- [ ] Partial refund — not implemented
+- [x] Partial refund (backend + UI)
 
 ### Task 34: Add Payment to Invoice Module
 - [x] Payment link generation (via initializePayment)
 - [x] Payment status tracking (via webhooks)
-- [ ] Payment reminders — not started
+- [x] Payment reminders (cron)
 - [ ] Partial payments — not implemented
 
 ### Task 35: Create Payment UI Components
 - [ ] Not started (Paystack/Flutterwave popups handle UI)
 
 ### Task 36: Implement Saved Cards Feature
-- [ ] Not started
+- [x] Saved cards (tokenization) for Paystack
 
 ### Task 37: Add Currency Handling
 - [x] NGN, KES, GHS, ZAR, USD, GBP, EUR supported in settings
@@ -234,7 +234,7 @@
 - [x] Paystack key input fields
 - [x] Flutterwave key input fields
 - [x] Test connection button
-- [~] Save button — not fully wired to correct endpoints
+- [x] Save button wired
 - [ ] Webhook URL display — not started
 
 ---
@@ -276,14 +276,14 @@
 - [x] Chat window with messages — user/assistant bubbles with left/right alignment
 - [x] Typing indicator — Loader2 spinner while AI responds
 - [x] Quick action buttons — rendered below assistant messages
-- [ ] Chat history viewer — not started
+- [x] Chat history viewer
 
 ### Task 47: Admin Configuration Interface
 - [x] Response template editor (settings/ai page)
 - [x] FAQ builder (trigger + response pairs)
 - [x] Language selection
 - [x] Response style (Professional, Friendly, Casual)
-- [ ] Business hours for AI — not started
+- [x] Business hours for AI
 - [ ] Fallback to human agent — not started
 
 ### Task 48: Conversation Analytics
@@ -296,7 +296,8 @@
 - [ ] Not started
 
 ### Task 50: WhatsApp AI Integration
-- [ ] Not started
+- [x] Booking confirmations/reminders via WhatsApp Business API
+- [x] Delivery status tracking + webhook
 
 ### Task 51: Voice AI (Optional Future)
 - [ ] Not started
@@ -374,15 +375,15 @@
 
 ### Task 65: Build Customer Portal
 - [x] Booking list view
-- [ ] Payment history — not started
-- [ ] Update profile — not started
+- [x] Payment history
+- [x] Update profile
 
 ### Task 66: Implement Real-time Features
 - [ ] Not started
 
 ### Task 67: Add Dark/Light Theme
 - [x] Dark mode supported via Tailwind dark: variants
-- [ ] Theme toggle UI — not started
+- [x] Theme toggle UI
 
 ### Task 68: Responsive Design
 - [x] Collapsible sidebar
@@ -418,8 +419,8 @@
 - [ ] **Inventory management** — track materials/products used per job
 - [ ] **Commission tracking** — per-technician commission reports
 - [ ] **Automated marketing** — email campaigns for re-engaging lapsed customers
-- [ ] **WhatsApp integration** — booking confirmations/reminders via WhatsApp Business API
-- [ ] **POS / on-site payment** — Paystack Terminal / Flutterwave POS
+- [x] **WhatsApp integration** — booking confirmations/reminders via WhatsApp Business API
+- [x] **POS / on-site payment** — Paystack Terminal / Flutterwave POS
 - [ ] **Dynamic pricing** — surge pricing for same-day, discounts for off-peak
 - [x] **Technician availability settings**
 - [x] **Service images upload** — base64 image upload + thumbnail preview on service card
@@ -431,16 +432,16 @@
 - [x] **Webhook management UI** in admin panel
 - [x] **In-app notification viewer**
 - [x] **Team notifications** — multi-select team members + send in-app notification
-- [ ] **Saved cards (tokenization)** for Paystack
-- [ ] **Subscription management** (tenant billing)
+- [x] **Saved cards (tokenization)** for Paystack
+- [x] **Subscription management** (tenant billing)
 - [x] **Skill tagging** for technicians — skills JSON field, editor UI + autocomplete
 - [ ] **Auto-assignment rules** for dispatches
 - [ ] **Job offer system** (techs claim jobs)
-- [ ] **SMS/WhatsApp delivery tracking**
+- [x] **SMS/WhatsApp delivery tracking**
 - [ ] **Drive-time calculation** in scheduling
 - [ ] **Tenant custom domain setup**
-- [ ] **OAuth** (Google, Microsoft login)
-- [ ] **Two-factor authentication**
+- [x] **OAuth** (Google, Microsoft login)
+- [x] **Two-factor authentication**
 - [ ] **Real-time location tracking** — technician GPS on map
 - [ ] **Settlement tracking** — reconcile payments with provider settlements
 - [ ] **Customer satisfaction tracking** — AI-powered sentiment analysis

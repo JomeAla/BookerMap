@@ -6,6 +6,7 @@ import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaystackSettingsDto } from './dto/paystack-settings.dto';
 import { FlutterwaveSettingsDto } from './dto/flutterwave-settings.dto';
+import { WhatsAppSettingsDto } from '../notification/dto/whatsapp-settings.dto';
 import { encrypt, decrypt } from './helpers/crypto.helper';
 import axios from 'axios';
 
@@ -74,6 +75,41 @@ export class PaymentSettingsController {
     };
   }
 
+  @Post('whatsapp')
+  async saveWhatsApp(@Body() dto: WhatsAppSettingsDto, @TenantId() tenantId: string) {
+    const provider = 'WHATSAPP';
+
+    const existing = await this.prisma.paymentSettings.findUnique({
+      where: { tenantId_provider: { tenantId, provider: provider as any } },
+    });
+
+    const data: any = {};
+    if (dto.whatsappPhoneNumberId) data.whatsappPhoneNumberId = dto.whatsappPhoneNumberId;
+    if (dto.whatsappBusinessAccountId) data.whatsappBusinessAccountId = dto.whatsappBusinessAccountId;
+    if (dto.whatsappAccessToken) data.whatsappAccessToken = encrypt(dto.whatsappAccessToken);
+
+    if (existing) {
+      const settings = await this.prisma.paymentSettings.update({
+        where: { id: existing.id },
+        data,
+      });
+      return { success: true, data: { id: settings.id, provider: settings.provider } };
+    }
+
+    const settings = await this.prisma.paymentSettings.create({
+      data: {
+        tenantId,
+        provider: provider as any,
+        publicKey: '',
+        secretKey: `wa_${Date.now()}`,
+        ...data,
+        isActive: true,
+      },
+    });
+
+    return { success: true, data: { id: settings.id, provider: settings.provider } };
+  }
+
   @Post('validate')
   async validate(
     @Body() body: { provider: 'PAYSTACK' | 'FLUTTERWAVE' },
@@ -129,7 +165,7 @@ export class PaymentSettingsController {
 
   @Delete(':provider')
   async removeProvider(@Param('provider') provider: string, @TenantId() tenantId: string) {
-    if (!['PAYSTACK', 'FLUTTERWAVE'].includes(provider)) {
+    if (!['PAYSTACK', 'FLUTTERWAVE', 'WHATSAPP'].includes(provider)) {
       throw new HttpException('Invalid provider', 400);
     }
 

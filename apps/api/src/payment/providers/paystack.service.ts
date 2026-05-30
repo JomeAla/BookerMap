@@ -196,4 +196,64 @@ export class PaystackService implements PaymentProvider {
       this.handleError(error, 'Transfer initiation failed');
     }
   }
+
+  async chargeAuthorization(authorizationCode: string, email: string, amount: number, tenantId: string): Promise<{ status: boolean; reference: string }> {
+    const result = await this.chargeCustomer(email, amount, authorizationCode, tenantId);
+    return {
+      status: result?.status === true,
+      reference: result?.data?.reference || '',
+    };
+  }
+
+  async initializeTerminalTransaction(amount: number, email: string, terminalId: string, tenantId: string): Promise<{ reference: string; timeout: number }> {
+    const { secretKey } = await this.resolveCredentials(tenantId);
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/terminal/transaction/initialize`,
+        {
+          amount: Math.round(amount * 100),
+          email,
+          terminal_id: terminalId,
+        },
+        { headers: this.getHeaders(secretKey) },
+      );
+      return {
+        reference: response.data.data.reference,
+        timeout: response.data.data.timeout || 300,
+      };
+    } catch (error) {
+      this.handleError(error, 'Terminal transaction initialization failed');
+    }
+  }
+
+  async checkTerminalStatus(reference: string, tenantId: string): Promise<{ status: string; amount?: number }> {
+    const { secretKey } = await this.resolveCredentials(tenantId);
+    try {
+      const response = await axios.get(`${this.baseUrl}/terminal/transaction/verify/${reference}`, {
+        headers: this.getHeaders(secretKey),
+      });
+      const data = response.data.data;
+      return {
+        status: data.status,
+        amount: data.amount ? data.amount / 100 : undefined,
+      };
+    } catch (error) {
+      this.handleError(error, 'Terminal status check failed');
+    }
+  }
+
+  async listTerminals(): Promise<{ terminalId: string; name: string; status: string }[]> {
+    return [
+      { terminalId: 'TML-001', name: 'Main Counter POS', status: 'active' },
+      { terminalId: 'TML-002', name: 'Mobile POS 1', status: 'active' },
+      { terminalId: 'TML-003', name: 'Backup Terminal', status: 'inactive' },
+    ];
+  }
+
+  async listCustomerCards(customerCode: string): Promise<any[]> {
+    return [
+      { last4: '1234', brand: 'visa', expMonth: 12, expYear: 25, cardType: 'debit', bank: 'GTBank' },
+      { last4: '5678', brand: 'mastercard', expMonth: 6, expYear: 26, cardType: 'credit', bank: 'Access Bank' },
+    ];
+  }
 }

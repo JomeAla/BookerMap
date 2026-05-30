@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from './email.service';
 import { SmsService } from './sms.service';
+import { WhatsAppService } from './whatsapp.service';
 import { NotificationService } from './notification.service';
 
 @Injectable()
@@ -13,8 +14,46 @@ export class ReminderCronService {
     private prisma: PrismaService,
     private emailService: EmailService,
     private smsService: SmsService,
+    private whatsAppService: WhatsAppService,
     private notificationService: NotificationService,
   ) {}
+
+  @Cron('0 6 * * *')
+  async checkSubscriptionExpirations() {
+    this.logger.log('Running subscription expiration check...');
+
+    const now = new Date();
+    const expired = await this.prisma.subscription.findMany({
+      where: {
+        status: 'ACTIVE',
+        currentPeriodEnd: { lt: now },
+        plan: { not: 'FREE' },
+      },
+      include: {
+        tenant: { select: { id: true, name: true } },
+      },
+    });
+
+    this.logger.log(`Found ${expired.length} expired subscriptions`);
+
+    for (const sub of expired) {
+      await this.prisma.subscription.update({
+        where: { id: sub.id },
+        data: { status: 'EXPIRED' },
+      });
+
+      await this.notificationService.createNotification(
+        sub.tenantId,
+        'IN_APP' as any,
+        'IN_APP',
+        sub.tenantId,
+        'Subscription Expired',
+        `Your ${sub.plan} subscription has expired. Please renew to continue using all features.`,
+      );
+
+      this.logger.log(`Expired subscription ${sub.id} for tenant ${sub.tenant.name}`);
+    }
+  }
 
   @Cron(CronExpression.EVERY_HOUR)
   async sendBookingReminders() {
@@ -81,6 +120,25 @@ export class ReminderCronService {
             startTime: booking.startTime,
             endTime: booking.endTime,
           });
+        }
+
+        if (customer.phone) {
+          try {
+            await this.whatsAppService.sendTemplate(
+              customer.phone,
+              'booking_reminder',
+              {
+                customer_name: customerName,
+                service_name: booking.service.name,
+                start_time: booking.startTime.toLocaleString(),
+                booking_id: booking.id.slice(-8).toUpperCase(),
+              },
+            );
+          } catch (waError) {
+            this.logger.warn(
+              `WhatsApp reminder failed for booking ${booking.id}: ${waError instanceof Error ? waError.message : waError}`,
+            );
+          }
         }
 
         await this.notificationService.createNotification(

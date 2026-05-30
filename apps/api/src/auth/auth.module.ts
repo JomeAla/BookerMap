@@ -3,9 +3,13 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NotificationModule } from '../notification/notification.module';
+import { PrismaModule } from '../prisma/prisma.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { TwoFactorService } from './two-factor.service';
 import { JwtStrategy } from './jwt.strategy';
+import { GoogleStrategy } from './strategies/google.strategy';
+import { MicrosoftStrategy } from './strategies/microsoft.strategy';
 
 @Module({
   imports: [
@@ -21,9 +25,10 @@ import { JwtStrategy } from './jwt.strategy';
       }),
     }),
     NotificationModule,
+    PrismaModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, TwoFactorService, GoogleStrategy, MicrosoftStrategy],
   exports: [PassportModule, JwtModule, AuthService],
 })
 export class AuthModule {}

@@ -14,7 +14,8 @@ import { ArrowLeft, Mail, Phone, MapPin, Calendar, FileText, Tag, Edit3, X, Chec
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
-import type { Customer } from '@/types'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import type { Customer, SavedCard } from '@/types'
 
 export default function CustomerDetailPage() {
   const params = useParams()
@@ -44,6 +45,37 @@ export default function CustomerDetailPage() {
       addToast('Tags updated', 'success')
     },
     onError: () => addToast('Failed to update tags', 'error'),
+  })
+
+  const { data: savedCards, refetch: refetchCards } = useQuery({
+    queryKey: ['customer-cards', id],
+    queryFn: async () => {
+      const { data } = await api.get(`/payments/cards/${id}`)
+      return data.data as SavedCard[]
+    },
+    enabled: !!id,
+  })
+
+  const deleteCardMutation = useMutation({
+    mutationFn: async (cardId: string) => {
+      await api.delete(`/payments/cards/${cardId}`)
+    },
+    onSuccess: () => {
+      refetchCards()
+      addToast('Card deleted', 'success')
+    },
+    onError: () => addToast('Failed to delete card', 'error'),
+  })
+
+  const setDefaultMutation = useMutation({
+    mutationFn: async (cardId: string) => {
+      await api.put(`/payments/cards/${cardId}/default`)
+    },
+    onSuccess: () => {
+      refetchCards()
+      addToast('Default card updated', 'success')
+    },
+    onError: () => addToast('Failed to set default card', 'error'),
   })
 
   if (isLoading) return <PageLoader />
@@ -193,6 +225,56 @@ export default function CustomerDetailPage() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Saved Cards</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!savedCards?.length ? (
+            <div className="text-center py-6 text-gray-500">
+              <p className="text-sm">No saved cards</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {savedCards.map((card) => (
+                <div key={card.id} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <div className="text-sm">
+                    <span className="font-medium capitalize">{card.brand}</span> ****{card.last4}
+                    {card.expMonth && card.expYear && (
+                      <span className="text-gray-500 ml-2">Exp {card.expMonth}/{card.expYear}</span>
+                    )}
+                    {card.cardType && <span className="text-gray-400 ml-2 text-xs uppercase">{card.cardType}</span>}
+                    {card.bank && <span className="text-gray-400 ml-2 text-xs">{card.bank}</span>}
+                    {card.isDefault && <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Default</span>}
+                  </div>
+                  <div className="flex gap-2">
+                    {!card.isDefault && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDefaultMutation.mutate(card.id)}
+                        disabled={setDefaultMutation.isPending}
+                      >
+                        <Check className="h-3 w-3 mr-1" /> Default
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-500 hover:text-red-700"
+                      onClick={() => deleteCardMutation.mutate(card.id)}
+                      disabled={deleteCardMutation.isPending}
+                    >
+                      <X className="h-3 w-3 mr-1" /> Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

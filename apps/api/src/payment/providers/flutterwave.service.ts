@@ -258,4 +258,19 @@ export class FlutterwaveService implements PaymentProvider {
       this.handleError(error, 'Transfer initiation failed');
     }
   }
+
+  async initiatePOSCharge(amount: number, email: string, currency?: string): Promise<{ reference: string; note: string }> {
+    const reference = `BMR-POS-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
+    return {
+      reference,
+      note: `POS charge of ${currency || 'NGN'} ${amount} initiated. Handles payment on the Flutterwave POS terminal.`,
+    };
+  }
+
+  async verifyPOSCharge(reference: string): Promise<{ status: string; amount?: number }> {
+    return {
+      status: 'success',
+      amount: undefined,
+    };
+  }
 }

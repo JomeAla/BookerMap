@@ -132,9 +132,10 @@ describe('AuthService', () => {
         role: 'OWNER',
         tenantId: 'tenant-1',
         isActive: true,
+        twoFactorEnabled: false,
       });
 
-      const result = await service.login(loginDto);
+      const result = await service.login(loginDto) as any;
 
       expect(result).toBeDefined();
       expect(result.accessToken).toBe('mock-token');

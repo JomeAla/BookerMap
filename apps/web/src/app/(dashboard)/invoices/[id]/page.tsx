@@ -15,7 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { ArrowLeft, User, Mail, Calendar, DollarSign, FileText, Send, CheckCircle, Ban, Download, RotateCcw } from 'lucide-react'
-import type { Invoice, Payment } from '@/types'
+import { Select } from '@/components/ui/select'
+import type { Invoice, Payment, SavedCard } from '@/types'
 
 export default function InvoiceDetailPage() {
   const params = useParams()
@@ -53,6 +54,24 @@ export default function InvoiceDetailPage() {
       addToast('Invoice marked as paid', 'success')
     },
     onError: () => addToast('Failed to mark as paid', 'error'),
+  })
+
+  const [posDialogOpen, setPosDialogOpen] = React.useState(false)
+  const [posReference, setPosReference] = React.useState('')
+  const [posStatus, setPosStatus] = React.useState<string | null>(null)
+  const [posLoading, setPosLoading] = React.useState(false)
+
+  const [chargeDialogOpen, setChargeDialogOpen] = React.useState(false)
+  const [chargeCardId, setChargeCardId] = React.useState<string | null>(null)
+  const [chargeLoading, setChargeLoading] = React.useState(false)
+
+  const { data: savedCards } = useQuery({
+    queryKey: ['customer-cards', invoice?.customerId],
+    queryFn: async () => {
+      const { data } = await api.get(`/payments/cards/${invoice?.customerId}`)
+      return data.data as SavedCard[]
+    },
+    enabled: !!invoice?.customerId && invoice?.status !== 'PAID' && invoice?.status !== 'CANCELLED',
   })
 
   const [refundDialogOpen, setRefundDialogOpen] = React.useState(false)
@@ -99,6 +118,65 @@ export default function InvoiceDetailPage() {
     }
     setRefundError('')
     refundMutation.mutate({ paymentId: selectedPayment.id, amount })
+  }
+
+  async function handleGeneratePos() {
+    if (!invoice) return
+    setPosLoading(true)
+    setPosStatus(null)
+    try {
+      const { data } = await api.post('/payments/pos/initialize', {
+        amount: invoice.total,
+        provider: 'paystack',
+        invoiceId: invoice.id,
+      })
+      setPosReference(data.data.reference)
+      setPosStatus('initialized')
+      addToast('POS payment initialized', 'success')
+    } catch {
+      addToast('Failed to initialize POS payment', 'error')
+    } finally {
+      setPosLoading(false)
+    }
+  }
+
+  async function handleVerifyPos() {
+    if (!posReference) return
+    setPosLoading(true)
+    try {
+      const { data } = await api.post(`/payments/pos/verify/${posReference}`)
+      setPosStatus(data.data.status === 'success' ? 'completed' : 'failed')
+      if (data.data.status === 'success') {
+        queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+        addToast('POS payment verified', 'success')
+      } else {
+        addToast('POS payment not yet completed', 'warning')
+      }
+    } catch {
+      addToast('Failed to verify POS payment', 'error')
+    } finally {
+      setPosLoading(false)
+    }
+  }
+
+  async function handleChargeCard(cardId: string) {
+    if (!invoice?.customer?.email) return
+    setChargeCardId(cardId)
+    setChargeLoading(true)
+    try {
+      await api.post(`/payments/cards/${cardId}/charge`, {
+        amount: invoice.total,
+        email: invoice.customer.email,
+      })
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      addToast('Saved card charged successfully', 'success')
+      setChargeDialogOpen(false)
+    } catch {
+      addToast('Failed to charge saved card', 'error')
+    } finally {
+      setChargeCardId(null)
+      setChargeLoading(false)
+    }
   }
 
   if (isLoading) return <PageLoader />
@@ -165,9 +243,19 @@ export default function InvoiceDetailPage() {
               </Button>
             )}
             {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
-              <Button className="w-full" size="sm" variant="secondary" onClick={() => payMutation.mutate()} disabled={payMutation.isPending}>
-                <CheckCircle className="h-4 w-4 mr-2" /> Mark as Paid
-              </Button>
+              <>
+                <Button className="w-full" size="sm" variant="secondary" onClick={() => payMutation.mutate()} disabled={payMutation.isPending}>
+                  <CheckCircle className="h-4 w-4 mr-2" /> Mark as Paid
+                </Button>
+                <Button className="w-full" size="sm" variant="outline" onClick={() => setPosDialogOpen(true)}>
+                  Pay with POS
+                </Button>
+                {savedCards && savedCards.length > 0 && (
+                  <Button className="w-full" size="sm" variant="outline" onClick={() => setChargeDialogOpen(true)}>
+                    Charge Saved Card
+                  </Button>
+                )}
+              </>
             )}
             <a href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/invoices/${id}/pdf`} target="_blank" className="block">
               <Button className="w-full" size="sm" variant="outline">
@@ -287,6 +375,76 @@ export default function InvoiceDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={posDialogOpen} onOpenChange={setPosDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>POS Payment</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Amount: {formatCurrency(invoice?.total || 0)}
+            </p>
+            {!posReference ? (
+              <Button className="w-full" onClick={handleGeneratePos} disabled={posLoading}>
+                {posLoading ? 'Initializing...' : 'Generate POS Payment'}
+              </Button>
+            ) : (
+              <div className="space-y-3">
+                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Reference Code</p>
+                  <p className="text-sm font-mono font-bold break-all">{posReference}</p>
+                </div>
+                {posStatus === 'initialized' && (
+                  <Button className="w-full" variant="secondary" onClick={handleVerifyPos} disabled={posLoading}>
+                    {posLoading ? 'Checking...' : 'Verify Payment'}
+                  </Button>
+                )}
+                {posStatus === 'completed' && (
+                  <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
+                    <p className="text-sm font-medium text-green-700 dark:text-green-400">Payment Completed</p>
+                  </div>
+                )}
+                {posStatus === 'failed' && (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-center">
+                    <p className="text-sm font-medium text-red-700 dark:text-red-400">Payment Failed</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={chargeDialogOpen} onOpenChange={setChargeDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Charge Saved Card</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Amount: {formatCurrency(invoice?.total || 0)}
+            </p>
+            {savedCards?.map((card) => (
+              <div key={card.id} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <div className="text-sm">
+                  <span className="font-medium capitalize">{card.brand}</span> ****{card.last4}
+                  {card.expMonth && card.expYear && (
+                    <span className="text-gray-500 ml-2">Exp {card.expMonth}/{card.expYear}</span>
+                  )}
+                  {card.isDefault && <span className="ml-2 text-xs text-blue-600">Default</span>}
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => handleChargeCard(card.id)}
+                  disabled={chargeLoading && chargeCardId === card.id}
+                >
+                  {chargeLoading && chargeCardId === card.id ? 'Charging...' : 'Charge'}
+                </Button>
+              </div>
+            ))}
+            {(!savedCards || savedCards.length === 0) && (
+              <p className="text-sm text-gray-500 text-center">No saved cards available</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
         <DialogContent className="max-w-md">

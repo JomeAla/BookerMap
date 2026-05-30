@@ -37,6 +37,7 @@ enum InvoiceStatus {
 enum PaymentProvider {
   PAYSTACK
   FLUTTERWAVE
+  WHATSAPP
 }
 
 enum PaymentStatus {
@@ -52,6 +53,7 @@ enum NotificationType {
   SMS
   PUSH
   IN_APP
+  WHATSAPP
 }
 
 enum ReviewStatus {
@@ -66,6 +68,26 @@ enum JobStatus {
   STARTED
   COMPLETED
   CANCELLED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+  TRIALING
+}
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
 }
 
 model Tenant {
@@ -99,8 +121,50 @@ model Tenant {
   recurringBookings  RecurringBooking[]
   locations          Location[]
   reviews            Review[]
+  subscription       Subscription?
 
   @@map("tenants")
+}
+
+model Subscription {
+  id              String             @id @default(cuid())
+  tenantId        String             @unique
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan            SubscriptionPlan   @default(FREE)
+  status          SubscriptionStatus @default(ACTIVE)
+  billingCycle    BillingCycle       @default(MONTHLY)
+  price           Int                @default(0)
+  trialEndsAt     DateTime?
+  currentPeriodStart DateTime        @default(now())
+  currentPeriodEnd   DateTime
+  canceledAt      DateTime?
+  stripeSubscriptionId String?
+  paystackSubscriptionCode String?
+  metadata        Json?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  invoices SubscriptionInvoice[]
+
+  @@map("subscriptions")
+}
+
+model SubscriptionInvoice {
+  id              String   @id @default(cuid())
+  subscriptionId  String
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  tenantId        String
+  amount          Int
+  currency        String   @default("NGN")
+  status          String   @default("PENDING")
+  dueDate         DateTime
+  paidAt          DateTime?
+  reference       String?
+  provider        String?
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("subscription_invoices")
 }
 
 model User {
@@ -120,6 +184,10 @@ model User {
   resetTokenExpiresAt DateTime?
   availability        Json?
   skills              Json?
+  twoFactorSecret     String?
+  twoFactorEnabled    Boolean   @default(false)
+  twoFactorBackupCodes Json?
+  emailVerified       Boolean   @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -159,6 +227,7 @@ model Customer {
   bookings  Booking[]
   invoices  Invoice[]
   reviews   Review[]
+  savedCards SavedCard[]
 
   @@unique([tenantId, phone])
   @@map("customers")
@@ -444,16 +513,19 @@ model Payment {
 }
 
 model PaymentSettings {
-  id              String          @id @default(cuid())
-  provider        PaymentProvider
-  publicKey       String
-  secretKey       String          @unique
-  encryptionKey   String?
-  webhookSecret   String?
-  isLive          Boolean         @default(false)
-  isActive        Boolean         @default(true)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id                       String          @id @default(cuid())
+  provider                 PaymentProvider
+  publicKey                String
+  secretKey                String          @unique
+  encryptionKey            String?
+  webhookSecret            String?
+  isLive                   Boolean         @default(false)
+  isActive                 Boolean         @default(true)
+  whatsappPhoneNumberId    String?
+  whatsappBusinessAccountId String?
+  whatsappAccessToken      String?
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -479,6 +551,28 @@ model Coupon {
 
   @@unique([tenantId, code])
   @@map("coupons")
+}
+
+model SavedCard {
+  id            String   @id @default(cuid())
+  tenantId      String
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  authorizationCode String
+  last4         String
+  brand         String
+  expMonth      Int?
+  expYear       Int?
+  cardType      String?
+  bank          String?
+  reusable      Boolean  @default(true)
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@map("saved_cards")
 }
 
 model Notification {

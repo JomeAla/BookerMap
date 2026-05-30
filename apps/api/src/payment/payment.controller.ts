@@ -1,12 +1,17 @@
 import {
-  Controller, Post, Get, Param, Query, Body, UseGuards, HttpException, Logger,
+  Controller, Post, Get, Param, Query, Body, UseGuards, HttpException, Logger, Delete, Put,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PaymentService } from './payment.service';
+import { CardService } from './card.service';
+import { PaystackService } from './providers/paystack.service';
 import { InitializePaymentDto } from './dto/initialize-payment.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
+import { InitPosPaymentDto } from './dto/init-pos-payment.dto';
+import { SaveCardDto } from './dto/save-card.dto';
+import { ChargeCardDto } from './dto/charge-card.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentStatus } from '@prisma/client';
 
@@ -17,6 +22,8 @@ export class PaymentController {
 
   constructor(
     private paymentService: PaymentService,
+    private cardService: CardService,
+    private paystackService: PaystackService,
     private prisma: PrismaService,
   ) {}
 
@@ -128,5 +135,104 @@ export class PaymentController {
   async refund(@Body() dto: RefundPaymentDto, @TenantId() tenantId: string) {
     const result = await this.paymentService.refundPayment(dto.paymentId, dto.amount, tenantId);
     return { success: true, data: result };
+  }
+
+  @Post('pos/initialize')
+  async initPosPayment(@Body() dto: InitPosPaymentDto, @TenantId() tenantId: string) {
+    const result = await this.paymentService.initiatePOSPayment(tenantId, dto);
+
+    await this.prisma.payment.create({
+      data: {
+        amount: dto.amount,
+        currency: 'NGN',
+        status: 'PENDING',
+        provider: dto.provider === 'flutterwave' ? 'FLUTTERWAVE' : 'PAYSTACK',
+        providerRef: result.reference,
+        invoiceId: dto.invoiceId,
+      },
+    });
+
+    return { success: true, data: result };
+  }
+
+  @Post('pos/verify/:reference')
+  async verifyPosPayment(@Param('reference') reference: string, @TenantId() tenantId: string) {
+    const result = await this.paymentService.verifyPOSPayment(tenantId, reference);
+
+    const payment = await this.prisma.payment.findFirst({
+      where: { providerRef: reference, invoice: { tenantId } },
+    });
+
+    if (payment && result.status === 'success') {
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: 'SUCCESS' },
+      });
+      await this.prisma.invoice.update({
+        where: { id: payment.invoiceId },
+        data: { status: 'PAID', paidAt: new Date() },
+      });
+    }
+
+    return { success: true, data: result };
+  }
+
+  @Get('terminals')
+  async listTerminals() {
+    const terminals = await this.paystackService.listTerminals();
+    return { success: true, data: terminals };
+  }
+
+  @Post('cards')
+  async saveCard(@Body() dto: SaveCardDto, @TenantId() tenantId: string) {
+    const card = await this.cardService.saveCard(tenantId, dto.customerId, {
+      authorizationCode: dto.authorizationCode,
+      last4: dto.last4,
+      brand: dto.brand,
+      expMonth: dto.expMonth,
+      expYear: dto.expYear,
+      bank: dto.bank,
+      cardType: dto.cardType,
+    });
+    return { success: true, data: card };
+  }
+
+  @Get('cards/:customerId')
+  async listCustomerCards(@Param('customerId') customerId: string, @TenantId() tenantId: string) {
+    const cards = await this.cardService.getCustomerCards(tenantId, customerId);
+    return { success: true, data: cards };
+  }
+
+  @Delete('cards/:id')
+  async deleteCard(@Param('id') id: string, @TenantId() tenantId: string) {
+    await this.cardService.deleteCard(id, tenantId);
+    return { success: true };
+  }
+
+  @Post('cards/:id/charge')
+  async chargeCard(
+    @Param('id') id: string,
+    @Body() dto: ChargeCardDto,
+    @TenantId() tenantId: string,
+  ) {
+    const card = await this.prisma.savedCard.findFirst({ where: { id, tenantId } });
+    if (!card) throw new HttpException('Card not found', 404);
+
+    const result = await this.cardService.chargeSavedCard(
+      tenantId,
+      card.customerId,
+      id,
+      dto.amount,
+      dto.email,
+    );
+    return { success: true, data: result };
+  }
+
+  @Put('cards/:id/default')
+  async setDefaultCard(@Param('id') id: string, @TenantId() tenantId: string, @CurrentUser() user: any) {
+    const card = await this.prisma.savedCard.findFirst({ where: { id, tenantId } });
+    if (!card) throw new HttpException('Card not found', 404);
+    await this.cardService.setDefault(id, card.customerId, tenantId);
+    return { success: true };
   }
 }

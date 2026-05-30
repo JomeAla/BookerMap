@@ -141,4 +141,29 @@ export class PaymentService {
 
     return result;
   }
+
+  async initiatePOSPayment(tenantId: string, data: { amount: number; terminalId?: string; provider: string; invoiceId?: string; bookingId?: string }) {
+    const reference = `BMR-POS-${tenantId.slice(0, 6)}-${Date.now()}`.toUpperCase();
+
+    if (data.provider === 'paystack') {
+      const result = await this.paystackService.initializeTerminalTransaction(
+        data.amount,
+        'pos@bookermap.com',
+        data.terminalId || 'TML-001',
+        tenantId,
+      );
+      return { reference: result.reference, timeout: result.timeout };
+    }
+
+    const result = await this.flutterwaveService.initiatePOSCharge(data.amount, 'pos@bookermap.com');
+    return { reference: result.reference, note: result.note };
+  }
+
+  async verifyPOSPayment(tenantId: string, reference: string) {
+    const provider = await this.getProviderForTenant(tenantId);
+    if (provider.providerName === 'PAYSTACK') {
+      return this.paystackService.checkTerminalStatus(reference, tenantId);
+    }
+    return this.flutterwaveService.verifyPOSCharge(reference);
+  }
 }

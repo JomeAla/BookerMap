@@ -28,6 +28,7 @@ export enum InvoiceStatus {
 export enum PaymentProvider {
   PAYSTACK = 'PAYSTACK',
   FLUTTERWAVE = 'FLUTTERWAVE',
+  WHATSAPP = 'WHATSAPP',
 }
 
 export enum PaymentStatus {
@@ -278,6 +279,9 @@ export interface PaymentSettings {
   webhookSecret?: string | null
   isLive: boolean
   isActive: boolean
+  whatsappPhoneNumberId?: string | null
+  whatsappBusinessAccountId?: string | null
+  whatsappAccessToken?: string | null
   createdAt: string
   updatedAt: string
   tenantId: string
@@ -377,6 +381,29 @@ export interface Review {
   booking?: Booking & { service?: Service; customer?: Customer; technician?: User }
   customer?: Customer
   technician?: User
+}
+
+export interface SavedCard {
+  id: string
+  tenantId: string
+  customerId: string
+  authorizationCode: string
+  last4: string
+  brand: string
+  expMonth?: number | null
+  expYear?: number | null
+  cardType?: string | null
+  bank?: string | null
+  reusable: boolean
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Terminal {
+  terminalId: string
+  name: string
+  status: string
 }
 
 export interface AiResponse {
