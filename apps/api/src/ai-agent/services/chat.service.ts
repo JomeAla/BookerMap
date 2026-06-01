@@ -5,6 +5,7 @@ import { ResponseService } from './response.service';
 import { TaskExecutor } from './task-executor.service';
 import { EscalationService } from './escalation.service';
 import { PaymentHandler } from '../handlers/payment.handler';
+import { FlowService } from './flow.service';
 import { detectPaymentIntent } from '../handlers/intent-detector';
 import { EntityMap, ConversationState, ChatResponse } from '../dto/chat-message.dto';
 
@@ -19,6 +20,7 @@ export class ChatService {
     private readonly taskExecutor: TaskExecutor,
     private readonly escalationService: EscalationService,
     private readonly paymentHandler: PaymentHandler,
+    private readonly flowService: FlowService,
   ) {}
 
   private readonly escalationKeywords = [
@@ -299,6 +301,26 @@ export class ChatService {
       this.contexts.set(convId, context);
       await this.saveMessage(convId, 'assistant', reply, intent, entities);
       return { reply, intent, entities, conversationId: convId };
+    }
+
+    const flowResult = await this.flowService.findMatchingFlow(tenantId, {
+      message,
+      entities: context.entities as Record<string, any>,
+      bookingStatus: (context.entities as any)?.bookingStatus,
+    });
+
+    if (flowResult?.executed && flowResult?.reply) {
+      context = this.createNewContext();
+      this.contexts.set(convId, context);
+      await this.saveMessage(convId, 'assistant', flowResult.reply, 'FLOW', flowResult.variables || {});
+      this.fallbackCounts.delete(convId);
+      return {
+        reply: flowResult.reply,
+        intent: 'FLOW',
+        entities: flowResult.variables || {},
+        conversationId: convId,
+        quickReplies: flowResult.quickReplies,
+      };
     }
 
     context = this.createNewContext();

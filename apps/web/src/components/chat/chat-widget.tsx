@@ -4,6 +4,9 @@ import * as React from 'react'
 import { api } from '@/lib/api'
 import { MessageSquare, X, Send, Loader2, ExternalLink, CheckCircle, XCircle } from 'lucide-react'
 import type { ChatPaymentAction } from '@/types'
+import { VoiceInputButton } from '@/components/chat/voice-input-button'
+import { VoiceOutputToggle } from '@/components/chat/voice-output-toggle'
+import { getSpeechService } from '@/lib/speech-service'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -116,6 +119,7 @@ export function ChatWidget({ tenantSlug }: { tenantSlug?: string }) {
   const [input, setInput] = React.useState('')
   const [loading, setLoading] = React.useState(false)
   const [conversationId, setConversationId] = React.useState<string | null>(null)
+  const [voiceOutputEnabled, setVoiceOutputEnabled] = React.useState(false)
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
@@ -143,8 +147,36 @@ export function ChatWidget({ tenantSlug }: { tenantSlug?: string }) {
     }
   }, [open])
 
+  React.useEffect(() => {
+    try {
+      const stored = localStorage.getItem('bm_voice_output_enabled')
+      setVoiceOutputEnabled(stored === 'true')
+    } catch {}
+  }, [])
+
+  React.useEffect(() => {
+    if (messages.length > 0) {
+      const last = messages[messages.length - 1]
+      if (last.role === 'assistant' && voiceOutputEnabled && !loading) {
+        const service = getSpeechService()
+        service.stopSpeaking()
+        window.setTimeout(() => {
+          service.speak(last.content)
+        }, 100)
+      }
+    }
+  }, [messages, voiceOutputEnabled, loading])
+
+  React.useEffect(() => {
+    return () => {
+      try { getSpeechService().stopSpeaking() } catch {}
+    }
+  }, [])
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return
+
+    getSpeechService().stopSpeaking()
 
     const userMessage: Message = { role: 'user', content: text.trim() }
     setMessages((prev) => [...prev, userMessage])
@@ -207,12 +239,15 @@ export function ChatWidget({ tenantSlug }: { tenantSlug?: string }) {
               <MessageSquare className="h-5 w-5" />
               <span className="font-semibold text-sm">BookerMap Assistant</span>
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="p-1 rounded hover:bg-blue-500 transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <VoiceOutputToggle />
+              <button
+                onClick={() => setOpen(false)}
+                className="p-1 rounded hover:bg-blue-500 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[300px] max-h-[400px] bg-gray-50 dark:bg-gray-950">
@@ -267,6 +302,7 @@ export function ChatWidget({ tenantSlug }: { tenantSlug?: string }) {
               disabled={loading}
               className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             />
+            <VoiceInputButton onResult={(text) => setInput((prev) => prev + text)} disabled={loading} />
             <button
               onClick={() => sendMessage(input)}
               disabled={!input.trim() || loading}

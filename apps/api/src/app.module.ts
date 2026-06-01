@@ -1,8 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_FILTER, APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
+import { PrismaService } from './prisma/prisma.service';
 import { AuthModule } from './auth/auth.module';
 import { TenantModule } from './tenant/tenant.module';
 import { UserModule } from './user/user.module';
@@ -32,8 +33,13 @@ import { MarketingModule } from './marketing/marketing.module';
 import { FilesModule } from './files/files.module';
 import { CommissionModule } from './commission/commission.module';
 import { SplitPaymentModule } from './split-payment/split-payment.module';
+import { SettlementModule } from './settlement/settlement.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { SatisfactionModule } from './satisfaction/satisfaction.module';
+import { DisputeModule } from './dispute/dispute.module';
 import { CommonModule } from './common/common.module';
+import { PublicApiModule } from './public-api/public-api.module';
+import { DomainResolverMiddleware } from './common/middleware/domain-resolver.middleware';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -76,7 +82,11 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     FilesModule,
     CommissionModule,
     SplitPaymentModule,
+    SettlementModule,
     InventoryModule,
+    SatisfactionModule,
+    DisputeModule,
+    PublicApiModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
@@ -85,4 +95,10 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(DomainResolverMiddleware)
+      .forRoutes('public');
+  }
+}

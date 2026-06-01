@@ -119,63 +119,69 @@ enum EscalationPriority {
 }
 
 model Tenant {
-  id            String   @id @default(cuid())
-  name          String
-  slug          String   @unique
-  domain        String?
-  logo          String?
-  primaryColor  String   @default("#3B82F6")
-  timezone      String   @default("Africa/Lagos")
-  currency      String   @default("NGN")
-  trialEndsAt     DateTime?
-  platformFeeRate Float     @default(10)
-  aiSettings      Json?
-  isActive        Boolean   @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                      String    @id @default(cuid())
+  name                    String
+  slug                    String    @unique
+  domain                  String?
+  customDomain            String?   @unique
+  domainVerified          Boolean   @default(false)
+  domainVerifiedAt        DateTime?
+  domainVerificationToken String?
+  logo                    String?
+  primaryColor            String    @default("#3B82F6")
+  timezone                String    @default("Africa/Lagos")
+  currency                String    @default("NGN")
+  trialEndsAt             DateTime?
+  platformFeeRate         Float     @default(10)
+  aiSettings              Json?
+  isActive                Boolean   @default(true)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
-  users              User[]
-  customers          Customer[]
-  services           Service[]
-  serviceCategories  ServiceCategory[]
-  territories        Territory[]
-  bookings           Booking[]
-  invoices           Invoice[]
-  notifications      Notification[]
-  webhooks           Webhook[]
-  aiResponses        AiResponse[]
-  aiConversations    AiConversation[]
-  paymentSettings    PaymentSettings[]
-  coupons            Coupon[]
-  recurringBookings  RecurringBooking[]
-  locations          Location[]
-  reviews            Review[]
-  inventoryItems     InventoryItem[]
-  bookingInventory   BookingInventory[]
-  splitPayments      SplitPayment[]
-  escalations        Escalation[]
-  subscription       Subscription?
+  users             User[]
+  customers         Customer[]
+  services          Service[]
+  serviceCategories ServiceCategory[]
+  territories       Territory[]
+  bookings          Booking[]
+  invoices          Invoice[]
+  notifications     Notification[]
+  webhooks          Webhook[]
+  aiResponses       AiResponse[]
+  aiConversations   AiConversation[]
+  paymentSettings   PaymentSettings[]
+  coupons           Coupon[]
+  recurringBookings RecurringBooking[]
+  locations         Location[]
+  reviews           Review[]
+  inventoryItems    InventoryItem[]
+  bookingInventory  BookingInventory[]
+  splitPayments     SplitPayment[]     @relation("SplitPaymentTenant")
+  settlements       Settlement[]       @relation("SettlementTenant")
+  escalations       Escalation[]
+  subscription      Subscription?
+  conversationFlows ConversationFlow[]
 
   @@map("tenants")
 }
 
 model Subscription {
-  id              String             @id @default(cuid())
-  tenantId        String             @unique
-  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  plan            SubscriptionPlan   @default(FREE)
-  status          SubscriptionStatus @default(ACTIVE)
-  billingCycle    BillingCycle       @default(MONTHLY)
-  price           Int                @default(0)
-  trialEndsAt     DateTime?
-  currentPeriodStart DateTime        @default(now())
-  currentPeriodEnd   DateTime
-  canceledAt      DateTime?
-  stripeSubscriptionId String?
+  id                       String             @id @default(cuid())
+  tenantId                 String             @unique
+  tenant                   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan                     SubscriptionPlan   @default(FREE)
+  status                   SubscriptionStatus @default(ACTIVE)
+  billingCycle             BillingCycle       @default(MONTHLY)
+  price                    Int                @default(0)
+  trialEndsAt              DateTime?
+  currentPeriodStart       DateTime           @default(now())
+  currentPeriodEnd         DateTime
+  canceledAt               DateTime?
+  stripeSubscriptionId     String?
   paystackSubscriptionCode String?
-  metadata        Json?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  metadata                 Json?
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
 
   invoices SubscriptionInvoice[]
 
@@ -183,90 +189,97 @@ model Subscription {
 }
 
 model SubscriptionInvoice {
-  id              String   @id @default(cuid())
-  subscriptionId  String
-  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  tenantId        String
-  amount          Int
-  currency        String   @default("NGN")
-  status          String   @default("PENDING")
-  dueDate         DateTime
-  paidAt          DateTime?
-  reference       String?
-  provider        String?
-  createdAt       DateTime @default(now())
+  id             String       @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  tenantId       String
+  amount         Int
+  currency       String       @default("NGN")
+  status         String       @default("PENDING")
+  dueDate        DateTime
+  paidAt         DateTime?
+  reference      String?
+  provider       String?
+  createdAt      DateTime     @default(now())
 
   @@index([tenantId])
   @@map("subscription_invoices")
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  passwordHash  String
-  firstName     String
-  lastName      String
-  phone         String?
-  role          UserRole @default(TECHNICIAN)
-  isActive            Boolean    @default(true)
-  avatarUrl           String?
-  latitude            Float?
-  longitude           Float?
-  lastLoginAt         DateTime?
-  resetToken          String?    @unique
-  resetTokenExpiresAt DateTime?
-  availability        Json?
-  skills              Json?
-  twoFactorSecret     String?
-  twoFactorEnabled    Boolean   @default(false)
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  passwordHash         String
+  firstName            String
+  lastName             String
+  phone                String?
+  role                 UserRole  @default(TECHNICIAN)
+  isActive             Boolean   @default(true)
+  avatarUrl            String?
+  latitude             Float?
+  longitude            Float?
+  lastLoginAt          DateTime?
+  resetToken           String?   @unique
+  resetTokenExpiresAt  DateTime?
+  availability         Json?
+  skills               Json?
+  twoFactorSecret      String?
+  twoFactorEnabled     Boolean   @default(false)
   twoFactorBackupCodes Json?
-  emailVerified       Boolean   @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  emailVerified        Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   tenantId   String
-  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   locationId String?
   location   Location? @relation(fields: [locationId], references: [id])
 
-  assignedBookings Booking[]  @relation("AssignedTechnician")
-  jobAssignments   Dispatch[] @relation("AssignedUser")
-  reviews          Review[]   @relation("TechnicianReviews")
-  refreshTokens    RefreshToken[]
-  notifications    Notification[]
+  assignedBookings    Booking[]            @relation("AssignedTechnician")
+  jobAssignments      Dispatch[]           @relation("AssignedUser")
+  reviews             Review[]             @relation("TechnicianReviews")
+  refreshTokens       RefreshToken[]
+  notifications       Notification[]
   googleCalendarToken GoogleCalendarToken?
   commissionRate      Float?
-  commissionType      String?   @default("PERCENTAGE")
-  splitPayments       SplitPayment[]
-  escalations         Escalation[]   @relation("EscalatedCustomer")
-  assignedEscalations Escalation[]   @relation("EscalatedAgent")
+  commissionType      String?              @default("PERCENTAGE")
+  splitPayments       SplitPayment[]       @relation("SplitPaymentProvider")
+  settlements         Settlement[]
+  escalations         Escalation[]         @relation("EscalatedCustomer")
+  assignedEscalations Escalation[]         @relation("EscalatedAgent")
+  locationUpdates     LocationUpdate[]
+  disputesAsCustomer  Dispute[]            @relation("Disputant")
+  resolvedDisputes    Dispute[]            @relation("Resolver")
+  disputeEvidence     DisputeEvidence[]
 
   @@unique([tenantId, email])
   @@map("users")
 }
 
 model Customer {
-  id            String   @id @default(cuid())
-  email         String?
-  firstName     String
-  lastName      String
-  phone         String
-  notes         String?
-  tags          String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id        String   @id @default(cuid())
+  email     String?
+  firstName String
+  lastName  String
+  phone     String
+  notes     String?
+  tags      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenantId   String
-  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   locationId String?
   location   Location? @relation(fields: [locationId], references: [id])
 
-  addresses CustomerAddress[]
-  bookings  Booking[]
-  invoices  Invoice[]
-  reviews   Review[]
-  savedCards SavedCard[]
-  recurringPayments RecurringPayment[]
+  addresses           CustomerAddress[]
+  bookings            Booking[]
+  invoices            Invoice[]
+  reviews             Review[]
+  savedCards          SavedCard[]
+  recurringPayments   RecurringPayment[]
+  satisfactionSurveys SatisfactionSurvey[]
+  npsResponses        NPSResponse[]
 
   @@unique([tenantId, phone])
   @@map("customers")
@@ -301,14 +314,14 @@ model Service {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tenantId    String
-  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  categoryId  String?
-  category    ServiceCategory? @relation(fields: [categoryId], references: [id])
+  tenantId   String
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  categoryId String?
+  category   ServiceCategory? @relation(fields: [categoryId], references: [id])
 
-  modifiers    ServiceModifier[]
-  intakeFields IntakeField[]
-  bookings     Booking[]
+  modifiers         ServiceModifier[]
+  intakeFields      IntakeField[]
+  bookings          Booking[]
   territoryServices TerritoryService[]
   recurringPayments RecurringPayment[] @relation("ServiceRecurringPayments")
 
@@ -330,9 +343,9 @@ model ServiceCategory {
 }
 
 model ServiceModifier {
-  id        String  @id @default(cuid())
-  name      String
-  price     Float
+  id         String  @id @default(cuid())
+  name       String
+  price      Float
   isRequired Boolean @default(false)
 
   serviceId String
@@ -356,12 +369,12 @@ model IntakeField {
 }
 
 model Territory {
-  id          String   @id @default(cuid())
-  name        String
-  boundaries  Json?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  name       String
+  boundaries Json?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -372,11 +385,11 @@ model Territory {
 }
 
 model TerritoryService {
-  territoryId String
-  territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
-  serviceId   String
-  service     Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  price       Float?
+  territoryId  String
+  territory    Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  serviceId    String
+  service      Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  price        Float?
   availability Json?
 
   @@id([territoryId, serviceId])
@@ -405,14 +418,18 @@ model Booking {
   technicianId String?
   technician   User?     @relation("AssignedTechnician", fields: [technicianId], references: [id])
 
-  invoices     Invoice[]
-  dispatch     Dispatch?
-  reviews      Review[]
-  recurrenceId   String?
-  recurrence     RecurringBooking? @relation(fields: [recurrenceId], references: [id])
-  inventoryUsage BookingInventory[]
-  files        BookingFile[]
-  splitPayments  SplitPayment[]
+  invoices            Invoice[]
+  dispatch            Dispatch?
+  reviews             Review[]
+  recurrenceId        String?
+  recurrence          RecurringBooking?    @relation(fields: [recurrenceId], references: [id])
+  inventoryUsage      BookingInventory[]
+  files               BookingFile[]
+  splitPayments       SplitPayment[]       @relation("SplitPaymentBooking")
+  satisfactionSurveys SatisfactionSurvey[]
+  locationUpdates     LocationUpdate[]
+  settlementLineItems SettlementLineItem[]
+  disputes            Dispute[]
 
   @@map("bookings")
 }
@@ -438,17 +455,38 @@ model Location {
   @@map("locations")
 }
 
-model RecurringBooking {
+model LocationUpdate {
   id        String   @id @default(cuid())
-  frequency String   @default("weekly")
-  interval  Int      @default(1)
-  dayOfWeek Int?
+  tenantId  String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  bookingId String?
+  booking   Booking? @relation(fields: [bookingId], references: [id])
+  latitude  Float
+  longitude Float
+  accuracy  Float?
+  speed     Float?
+  heading   Float?
+  timestamp DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([bookingId])
+  @@index([timestamp])
+  @@map("location_updates")
+}
+
+model RecurringBooking {
+  id         String    @id @default(cuid())
+  frequency  String    @default("weekly")
+  interval   Int       @default(1)
+  dayOfWeek  Int?
   dayOfMonth Int?
-  startDate DateTime
-  endDate   DateTime?
-  discount  Float    @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  startDate  DateTime
+  endDate    DateTime?
+  discount   Float     @default(0)
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -459,13 +497,13 @@ model RecurringBooking {
 }
 
 model Review {
-  id          String       @id @default(cuid())
-  rating      Int
-  comment     String?
-  adminReply  String?
-  status      ReviewStatus @default(PENDING)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id         String       @id @default(cuid())
+  rating     Int
+  comment    String?
+  adminReply String?
+  status     ReviewStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
 
   tenantId     String
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -480,19 +518,19 @@ model Review {
 }
 
 model Dispatch {
-  id            String   @id @default(cuid())
-  tenantId      String
-  bookingId     String @unique
-  booking       Booking  @relation(fields: [bookingId], references: [id])
-  assignedToId  String?  // technician who accepted the job
-  assignedTo    User?    @relation("AssignedUser", fields: [assignedToId], references: [id])
-  status        JobStatus @default(ASSIGNED) // ASSIGNED, OFFERED, ACCEPTED, STARTED, COMPLETED, CANCELLED
-  offeredAt     DateTime? // when job was first offered
-  acceptedAt    DateTime? // when technician accepted
-  startedAt     DateTime?
-  completedAt   DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String    @id @default(cuid())
+  tenantId     String
+  bookingId    String    @unique
+  booking      Booking   @relation(fields: [bookingId], references: [id])
+  assignedToId String? // technician who accepted the job
+  assignedTo   User?     @relation("AssignedUser", fields: [assignedToId], references: [id])
+  status       JobStatus @default(ASSIGNED) // ASSIGNED, OFFERED, ACCEPTED, STARTED, COMPLETED, CANCELLED
+  offeredAt    DateTime? // when job was first offered
+  acceptedAt   DateTime? // when technician accepted
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([tenantId])
   @@index([bookingId])
@@ -500,20 +538,20 @@ model Dispatch {
 }
 
 model Invoice {
-  id          String        @id @default(cuid())
-  invoiceNumber String       @unique
-  status      InvoiceStatus @default(DRAFT)
-  paidAmount  Float         @default(0)
-  subtotal    Float
-  tax         Float         @default(0)
-  taxRate     Float         @default(0)
-  discount    Float         @default(0)
-  total       Float
-  dueDate     DateTime
-  paidAt      DateTime?
-  notes       String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  status        InvoiceStatus @default(DRAFT)
+  paidAmount    Float         @default(0)
+  subtotal      Float
+  tax           Float         @default(0)
+  taxRate       Float         @default(0)
+  discount      Float         @default(0)
+  total         Float
+  dueDate       DateTime
+  paidAt        DateTime?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   tenantId   String
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -522,18 +560,19 @@ model Invoice {
   bookingId  String?
   booking    Booking? @relation(fields: [bookingId], references: [id])
 
-  lineItems  InvoiceLineItem[]
-  payments   Payment[]
+  lineItems            InvoiceLineItem[]
+  payments             Payment[]
   recurringPaymentLogs RecurringPaymentLog[] @relation("InvoiceRecurringPaymentLogs")
-  splitPayments SplitPayment[]
+  splitPayments        SplitPayment[]
+  disputes             Dispute[]
 
   @@map("invoices")
 }
 
 model InvoiceLineItem {
-  id          String  @id @default(cuid())
+  id          String @id @default(cuid())
   description String
-  quantity    Int     @default(1)
+  quantity    Int    @default(1)
   unitPrice   Float
   total       Float
 
@@ -544,38 +583,38 @@ model InvoiceLineItem {
 }
 
 model Payment {
-  id              String          @id @default(cuid())
-  amount          Float
-  currency        String          @default("NGN")
-  status          PaymentStatus   @default(PENDING)
-  provider        PaymentProvider
-  providerRef     String?
-  providerData    Json?
-  fee             Float?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id           String          @id @default(cuid())
+  amount       Float
+  currency     String          @default("NGN")
+  status       PaymentStatus   @default(PENDING)
+  provider     PaymentProvider
+  providerRef  String?
+  providerData Json?
+  fee          Float?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
-  invoiceId String
-  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+  invoiceId            String
+  invoice              Invoice               @relation(fields: [invoiceId], references: [id])
   recurringPaymentLogs RecurringPaymentLog[] @relation("PaymentRecurringPaymentLogs")
 
   @@map("payments")
 }
 
 model PaymentSettings {
-  id                       String          @id @default(cuid())
-  provider                 PaymentProvider
-  publicKey                String
-  secretKey                String          @unique
-  encryptionKey            String?
-  webhookSecret            String?
-  isLive                   Boolean         @default(false)
-  isActive                 Boolean         @default(true)
-  whatsappPhoneNumberId    String?
+  id                        String          @id @default(cuid())
+  provider                  PaymentProvider
+  publicKey                 String
+  secretKey                 String          @unique
+  encryptionKey             String?
+  webhookSecret             String?
+  isLive                    Boolean         @default(false)
+  isActive                  Boolean         @default(true)
+  whatsappPhoneNumberId     String?
   whatsappBusinessAccountId String?
-  whatsappAccessToken      String?
-  createdAt                DateTime        @default(now())
-  updatedAt                DateTime        @updatedAt
+  whatsappAccessToken       String?
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -585,16 +624,16 @@ model PaymentSettings {
 }
 
 model Coupon {
-  id          String   @id @default(cuid())
-  code        String
-  type        String   @default("percentage")
-  value       Float
-  maxUses     Int?
-  usedCount   Int      @default(0)
-  minAmount   Float?
-  expiresAt   DateTime?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  id        String    @id @default(cuid())
+  code      String
+  type      String    @default("percentage")
+  value     Float
+  maxUses   Int?
+  usedCount Int       @default(0)
+  minAmount Float?
+  expiresAt DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -604,42 +643,42 @@ model Coupon {
 }
 
 model PricingRule {
-  id          String           @id @default(cuid())
-  tenantId    String
-  name        String
-  type        PricingRuleType
-  priority    Int              @default(0)
-  serviceId   String?
-  daysOfWeek  Json?
-  startTime   String?
-  endTime     String?
+  id                    String          @id @default(cuid())
+  tenantId              String
+  name                  String
+  type                  PricingRuleType
+  priority              Int             @default(0)
+  serviceId             String?
+  daysOfWeek            Json?
+  startTime             String?
+  endTime               String?
   minHoursBeforeBooking Int?
-  adjustmentType String       @default("PERCENTAGE")
-  adjustmentValue Float
-  isActive    Boolean          @default(true)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  adjustmentType        String          @default("PERCENTAGE")
+  adjustmentValue       Float
+  isActive              Boolean         @default(true)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
 
   @@index([tenantId])
   @@map("pricing_rules")
 }
 
 model SavedCard {
-  id            String   @id @default(cuid())
-  tenantId      String
-  customerId    String
-  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id                String   @id @default(cuid())
+  tenantId          String
+  customerId        String
+  customer          Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   authorizationCode String
-  last4         String
-  brand         String
-  expMonth      Int?
-  expYear       Int?
-  cardType      String?
-  bank          String?
-  reusable      Boolean  @default(true)
-  isDefault     Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  last4             String
+  brand             String
+  expMonth          Int?
+  expYear           Int?
+  cardType          String?
+  bank              String?
+  reusable          Boolean  @default(true)
+  isDefault         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([tenantId])
   @@index([customerId])
@@ -659,27 +698,66 @@ model Notification {
   createdAt DateTime         @default(now())
 
   tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId   String?
-  user     User?  @relation(fields: [userId], references: [id])
+  user     User?   @relation(fields: [userId], references: [id])
 
   @@map("notifications")
 }
 
 model Webhook {
-  id             String   @id @default(cuid())
-  url            String
-  events         String[]
-  secret         String?
-  isActive       Boolean  @default(true)
+  id              String    @id @default(cuid())
+  url             String
+  events          String[]
+  secret          String?
+  isActive        Boolean   @default(true)
   lastTriggeredAt DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("webhooks")
+}
+
+model ConversationFlow {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  trigger      String // INTENT_KEYWORD, BOOKING_STATUS, PAYMENT_STATUS, etc.
+  triggerValue String // e.g., "cancel", "reschedule", "pay", "refund"
+  nodes        Json // JSON array of flow nodes
+  edges        Json // JSON array of connections between nodes
+  isActive     Boolean  @default(true)
+  version      Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  flowNodes FlowNode[]
+
+  @@index([tenantId])
+  @@index([isActive])
+  @@map("conversation_flows")
+}
+
+model FlowNode {
+  id        String           @id @default(cuid())
+  flowId    String
+  flow      ConversationFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  nodeType  String // START, MESSAGE, CONDITION, ACTION, INPUT, END
+  label     String? // display label for the node
+  content   Json? // message text, condition logic, action config
+  positionX Float            @default(0) // canvas position
+  positionY Float            @default(0)
+  config    Json? // additional configuration
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([flowId])
+  @@map("flow_nodes")
 }
 
 model AiConversation {
@@ -728,13 +806,13 @@ model AiResponse {
 }
 
 model GoogleCalendarToken {
-  id            String   @id @default(cuid())
-  accessToken   String
-  refreshToken  String?
-  expiryDate    DateTime?
-  googleEmail   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String    @id @default(cuid())
+  accessToken  String
+  refreshToken String?
+  expiryDate   DateTime?
+  googleEmail  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -743,19 +821,19 @@ model GoogleCalendarToken {
 }
 
 model Campaign {
-  id              String       @id @default(cuid())
+  id              String    @id @default(cuid())
   tenantId        String
   name            String
   subject         String
   body            String
   triggerDays     Int
-  triggerType     String       @default("LAPSED")
+  triggerType     String    @default("LAPSED")
   discountPercent Int?
-  isActive        Boolean      @default(true)
+  isActive        Boolean   @default(true)
   lastSentAt      DateTime?
-  sentCount       Int          @default(0)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  sentCount       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   logs CampaignLog[]
 
@@ -764,15 +842,15 @@ model Campaign {
 }
 
 model CampaignLog {
-  id          String   @id @default(cuid())
-  campaignId  String
-  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  tenantId    String
-  customerId  String?
-  email       String
-  sentAt      DateTime @default(now())
-  openedAt    DateTime?
-  clickedAt   DateTime?
+  id         String    @id @default(cuid())
+  campaignId String
+  campaign   Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  tenantId   String
+  customerId String?
+  email      String
+  sentAt     DateTime  @default(now())
+  openedAt   DateTime?
+  clickedAt  DateTime?
 
   @@index([tenantId])
   @@index([campaignId])
@@ -786,7 +864,7 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
 }
@@ -831,17 +909,17 @@ model BookingInventory {
 }
 
 model BookingFile {
-  id          String   @id @default(cuid())
-  tenantId    String
-  bookingId   String
-  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  fileName    String
-  fileType    String
-  fileSize    Int
-  category    String   @default("photo")
-  data        String
-  uploadedBy  String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  tenantId   String
+  bookingId  String
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fileName   String
+  fileType   String
+  fileSize   Int
+  category   String   @default("photo")
+  data       String
+  uploadedBy String?
+  createdAt  DateTime @default(now())
 
   @@index([tenantId])
   @@index([bookingId])
@@ -849,24 +927,24 @@ model BookingFile {
 }
 
 model RecurringPayment {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   tenantId      String
   customerId    String
-  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   serviceId     String
-  service       Service  @relation("ServiceRecurringPayments", fields: [serviceId], references: [id], onDelete: Cascade)
-  amount        Int      // in subunit (kobo/cents)
-  currency      String   @default("NGN")
-  frequency     String   // DAILY, WEEKLY, BIWEEKLY, MONTHLY, QUARTERLY, YEARLY
+  service       Service   @relation("ServiceRecurringPayments", fields: [serviceId], references: [id], onDelete: Cascade)
+  amount        Int // in subunit (kobo/cents)
+  currency      String    @default("NGN")
+  frequency     String // DAILY, WEEKLY, BIWEEKLY, MONTHLY, QUARTERLY, YEARLY
   startDate     DateTime
   endDate       DateTime?
   nextPaymentAt DateTime
-  isActive      Boolean  @default(true)
-  paymentMethod String   // PAYSTACK, FLUTTERWAVE
-  reference     String?  // external reference from payment provider
+  isActive      Boolean   @default(true)
+  paymentMethod String // PAYSTACK, FLUTTERWAVE
+  reference     String? // external reference from payment provider
   metadata      Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   recurringPaymentLogs RecurringPaymentLog[] @relation("RecurringPaymentLogs")
 
@@ -876,24 +954,77 @@ model RecurringPayment {
   @@map("recurring_payments")
 }
 
+enum SettlementStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Settlement {
+  id               String           @id @default(cuid())
+  tenantId         String
+  providerId       String
+  provider         User             @relation(fields: [providerId], references: [id])
+  periodStart      DateTime // start of settlement period
+  periodEnd        DateTime // end of settlement period
+  totalEarned      Float            @default(0) // total amount earned in period
+  totalFee         Float            @default(0) // total platform fees
+  netAmount        Float            @default(0) // amount to pay out (totalEarned - totalFee)
+  status           SettlementStatus @default(PENDING)
+  paidAt           DateTime?
+  paymentMethod    String? // bank transfer, mobile money, etc.
+  paymentReference String? // reference from payment provider
+  notes            String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  lineItems SettlementLineItem[]
+  tenant    Tenant               @relation("SettlementTenant", fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([providerId])
+  @@index([status])
+  @@map("settlements")
+}
+
+model SettlementLineItem {
+  id             String        @id @default(cuid())
+  settlementId   String
+  settlement     Settlement    @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  splitPaymentId String?
+  splitPayment   SplitPayment? @relation(fields: [splitPaymentId], references: [id])
+  bookingId      String?
+  booking        Booking?      @relation(fields: [bookingId], references: [id])
+  amount         Float
+  description    String?
+  createdAt      DateTime      @default(now())
+
+  @@index([settlementId])
+  @@map("settlement_line_items")
+}
+
 model SplitPayment {
-  id             String       @id @default(cuid())
+  id             String      @id @default(cuid())
   tenantId       String
-  tenant         Tenant       @relation(fields: [tenantId], references: [id])
+  tenant         Tenant      @relation("SplitPaymentTenant", fields: [tenantId], references: [id])
   bookingId      String
-  booking        Booking      @relation(fields: [bookingId], references: [id])
+  booking        Booking     @relation("SplitPaymentBooking", fields: [bookingId], references: [id])
   invoiceId      String?
-  invoice        Invoice?     @relation(fields: [invoiceId], references: [id])
+  invoice        Invoice?    @relation(fields: [invoiceId], references: [id])
   providerId     String
-  provider       User         @relation(fields: [providerId], references: [id])
+  provider       User        @relation("SplitPaymentProvider", fields: [providerId], references: [id])
   totalAmount    Float
   platformFee    Float
   providerAmount Float
   platformRate   Float
-  status         SplitStatus  @default(PENDING)
+  status         SplitStatus @default(PENDING)
   releasedAt     DateTime?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  settledAt      DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  settlementLineItems SettlementLineItem[]
 
   @@index([tenantId])
   @@index([bookingId])
@@ -902,19 +1033,19 @@ model SplitPayment {
 }
 
 model RecurringPaymentLog {
-  id          String   @id @default(cuid())
+  id                 String           @id @default(cuid())
   recurringPaymentId String
-  recurringPayment RecurringPayment @relation("RecurringPaymentLogs", fields: [recurringPaymentId], references: [id])
-  tenantId    String
-   invoiceId   String?
-   invoice     Invoice?  @relation("InvoiceRecurringPaymentLogs", fields: [invoiceId], references: [id])
-   paymentId   String?
-   payment     Payment?  @relation("PaymentRecurringPaymentLogs", fields: [paymentId], references: [id])
-  amount      Int
-  status      String   // PENDING, SUCCESS, FAILED, CANCELED
-  processedAt DateTime
-  failureReason String?
-  createdAt   DateTime @default(now())
+  recurringPayment   RecurringPayment @relation("RecurringPaymentLogs", fields: [recurringPaymentId], references: [id])
+  tenantId           String
+  invoiceId          String?
+  invoice            Invoice?         @relation("InvoiceRecurringPaymentLogs", fields: [invoiceId], references: [id])
+  paymentId          String?
+  payment            Payment?         @relation("PaymentRecurringPaymentLogs", fields: [paymentId], references: [id])
+  amount             Int
+  status             String // PENDING, SUCCESS, FAILED, CANCELED
+  processedAt        DateTime
+  failureReason      String?
+  createdAt          DateTime         @default(now())
 
   @@index([tenantId])
   @@index([recurringPaymentId])
@@ -942,6 +1073,42 @@ model Escalation {
   @@map("escalations")
 }
 
+model SatisfactionSurvey {
+  id          String   @id @default(cuid())
+  tenantId    String
+  bookingId   String?
+  booking     Booking? @relation(fields: [bookingId], references: [id])
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  touchpoint  String // BOOKING_CREATED, SERVICE_COMPLETED, PAYMENT_MADE, GENERAL
+  score       Int // 1-5 for CSAT, 0-10 for NPS
+  scoreType   String   @default("CSAT") // CSAT, NPS, CES
+  feedback    String? // open text feedback
+  category    String? // cleanliness, punctuality, quality, communication, value
+  respondedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([bookingId])
+  @@index([touchpoint])
+  @@map("satisfaction_surveys")
+}
+
+model NPSResponse {
+  id           String   @id @default(cuid())
+  tenantId     String
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  score        Int // 0-10
+  promoterType String // DETRACTOR (0-6), PASSIVE (7-8), PROMOTER (9-10)
+  reason       String? // why they gave that score
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("nps_responses")
+}
+
 model IdempotencyKey {
   id          String   @id @default(cuid())
   key         String   @unique
@@ -952,4 +1119,93 @@ model IdempotencyKey {
   expiresAt   DateTime
 
   @@map("idempotency_keys")
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  tenantId   String
+  name       String
+  key        String    @unique
+  keyPrefix  String
+  scopes     Json
+  rateLimit  Int       @default(100)
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([key])
+  @@map("api_keys")
+}
+
+enum DisputeStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  CLOSED
+}
+
+enum DisputeType {
+  CHARGEBACK
+  SERVICE_NOT_RENDERED
+  SERVICE_DEFICIENT
+  DAMAGES
+  BILLING_ERROR
+  OTHER
+}
+
+enum DisputeResolution {
+  REFUND_FULL
+  REFUND_PARTIAL
+  CREDIT
+  DISMISSED
+  OTHER
+}
+
+model Dispute {
+  id             String             @id @default(cuid())
+  tenantId       String
+  bookingId      String?
+  booking        Booking?           @relation(fields: [bookingId], references: [id])
+  invoiceId      String?
+  invoice        Invoice?           @relation(fields: [invoiceId], references: [id])
+  customerId     String
+  customer       User               @relation("Disputant", fields: [customerId], references: [id])
+  type           DisputeType
+  status         DisputeStatus      @default(OPEN)
+  description    String
+  amount         Float              @default(0)
+  resolution     DisputeResolution?
+  resolutionNote String?
+  resolvedById   String?
+  resolvedBy     User?              @relation("Resolver", fields: [resolvedById], references: [id])
+  resolvedAt     DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  evidence DisputeEvidence[]
+
+  @@index([tenantId])
+  @@index([bookingId])
+  @@index([customerId])
+  @@index([status])
+  @@map("disputes")
+}
+
+model DisputeEvidence {
+  id           String   @id @default(cuid())
+  disputeId    String
+  dispute      Dispute  @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  fileName     String
+  fileType     String
+  fileData     String
+  description  String?
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([disputeId])
+  @@map("dispute_evidence")
 }

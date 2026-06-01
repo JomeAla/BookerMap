@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { LocationService } from './location.service';
 import { CreateLocationDto } from './dto/create-location.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
+import { CreateLocationUpdateDto } from './dto/create-location-update.dto';
 
 @ApiTags('Locations')
 @ApiBearerAuth()
@@ -52,5 +53,26 @@ export class LocationController {
   @ApiResponse({ status: 404, description: 'Location not found' })
   remove(@TenantId() tenantId: string, @Param('id') id: string) {
     return this.locationService.remove(tenantId, id);
+  }
+
+  @Post('update')
+  @ApiOperation({ summary: 'Save GPS location update', description: 'Save a technician GPS location update' })
+  @ApiResponse({ status: 201, description: 'Location update saved' })
+  saveLocationUpdate(@TenantId() tenantId: string, @Body() dto: CreateLocationUpdateDto) {
+    return this.locationService.saveLocation(tenantId, dto);
+  }
+
+  @Get('latest/:userId')
+  @ApiOperation({ summary: 'Get latest location for a user', description: 'Returns the most recent location update for a technician' })
+  @ApiResponse({ status: 200, description: 'Latest location' })
+  getLatestLocation(@Param('userId') userId: string) {
+    return this.locationService.getLatestLocation(userId);
+  }
+
+  @Get('history/:bookingId')
+  @ApiOperation({ summary: 'Get location history for a booking', description: 'Returns all location points for a booking' })
+  @ApiResponse({ status: 200, description: 'Location history' })
+  getLocationHistory(@Param('bookingId') bookingId: string) {
+    return this.locationService.getLocationHistory(bookingId);
   }
 }

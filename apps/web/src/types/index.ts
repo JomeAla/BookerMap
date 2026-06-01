@@ -59,6 +59,9 @@ export interface Tenant {
   name: string
   slug: string
   domain?: string | null
+  customDomain?: string | null
+  domainVerified: boolean
+  domainVerifiedAt?: string | null
   logo?: string | null
   primaryColor: string
   timezone: string
@@ -364,6 +367,19 @@ export interface Location {
   tenantId: string
 }
 
+export interface LocationUpdate {
+  id: string
+  tenantId: string
+  userId: string
+  bookingId?: string | null
+  latitude: number
+  longitude: number
+  accuracy?: number | null
+  speed?: number | null
+  heading?: number | null
+  timestamp: string
+}
+
 export enum ReviewStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
@@ -507,6 +523,46 @@ export interface Escalation {
   messages?: AiMessage[]
 }
 
+export enum SettlementStatus {
+  PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+}
+
+export interface Settlement {
+  id: string
+  tenantId: string
+  providerId: string
+  provider?: { id: string; firstName: string; lastName: string; email?: string }
+  periodStart: string
+  periodEnd: string
+  totalEarned: number
+  totalFee: number
+  netAmount: number
+  status: SettlementStatus
+  paidAt?: string | null
+  paymentMethod?: string | null
+  paymentReference?: string | null
+  notes?: string | null
+  createdAt: string
+  updatedAt: string
+  lineItems?: SettlementLineItem[]
+  _count?: { lineItems: number }
+}
+
+export interface SettlementLineItem {
+  id: string
+  settlementId: string
+  splitPaymentId?: string | null
+  splitPayment?: { id: string; totalAmount: number; platformFee: number; providerAmount: number; status: string; createdAt: string }
+  bookingId?: string | null
+  booking?: { id: string; startTime: string; totalPrice: number; status: string; service?: { name: string }; customer?: { firstName: string; lastName: string } }
+  amount: number
+  description?: string | null
+  createdAt: string
+}
+
 export interface ChatPaymentAction {
   type: 'pay_now' | 'pay_later' | 'payment_confirmed' | 'payment_failed';
   invoiceNumber?: string;
@@ -515,6 +571,97 @@ export interface ChatPaymentAction {
   paymentLink?: string;
   reference?: string;
   invoiceId?: string;
+}
+
+export type Touchpoint = 'BOOKING_CREATED' | 'SERVICE_COMPLETED' | 'PAYMENT_MADE' | 'GENERAL';
+export type ScoreType = 'CSAT' | 'NPS' | 'CES';
+export type PromoterType = 'DETRACTOR' | 'PASSIVE' | 'PROMOTER';
+export type SatisfactionCategory = 'cleanliness' | 'punctuality' | 'quality' | 'communication' | 'value';
+
+export interface SatisfactionSurvey {
+  id: string
+  tenantId: string
+  bookingId?: string | null
+  booking?: Booking & { service?: Service } | null
+  customerId: string
+  customer?: Customer
+  touchpoint: Touchpoint
+  score: number
+  scoreType: ScoreType
+  feedback?: string | null
+  category?: SatisfactionCategory | null
+  respondedAt: string
+  createdAt: string
+}
+
+export interface NPSResponse {
+  id: string
+  tenantId: string
+  customerId: string
+  customer?: Customer
+  score: number
+  promoterType: PromoterType
+  reason?: string | null
+  createdAt: string
+}
+
+export interface CSATResult {
+  average: number
+  count: number
+  total: number
+}
+
+export interface NPSResult {
+  nps: number
+  promoters: number
+  passives: number
+  detractors: number
+  total: number
+}
+
+export interface TrendDataPoint {
+  month: string
+  averageScore: number
+  responses: number
+}
+
+export interface FeedbackByCategory {
+  category: string
+  averageScore: number
+  feedbackCount: number
+  totalResponses: number
+  feedbacks: string[]
+}
+
+export interface CustomerSatisfaction {
+  surveys: SatisfactionSurvey[]
+  npsResponses: NPSResponse[]
+}
+
+export interface ConversationFlow {
+  id: string
+  tenantId: string
+  name: string
+  description?: string | null
+  trigger: string
+  triggerValue: string
+  nodes: any[]
+  edges: any[]
+  isActive: boolean
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface FlowNode {
+  id: string
+  flowId: string
+  nodeType: 'START' | 'MESSAGE' | 'CONDITION' | 'ACTION' | 'INPUT' | 'END'
+  label?: string | null
+  content?: any
+  positionX: number
+  positionY: number
+  config?: any
 }
 
 export interface AiResponse {
@@ -526,4 +673,63 @@ export interface AiResponse {
   createdAt: string
   updatedAt: string
   tenantId: string
+}
+
+export enum DisputeStatus {
+  OPEN = 'OPEN',
+  INVESTIGATING = 'INVESTIGATING',
+  RESOLVED = 'RESOLVED',
+  CLOSED = 'CLOSED',
+}
+
+export enum DisputeType {
+  CHARGEBACK = 'CHARGEBACK',
+  SERVICE_NOT_RENDERED = 'SERVICE_NOT_RENDERED',
+  SERVICE_DEFICIENT = 'SERVICE_DEFICIENT',
+  DAMAGES = 'DAMAGES',
+  BILLING_ERROR = 'BILLING_ERROR',
+  OTHER = 'OTHER',
+}
+
+export enum DisputeResolution {
+  REFUND_FULL = 'REFUND_FULL',
+  REFUND_PARTIAL = 'REFUND_PARTIAL',
+  CREDIT = 'CREDIT',
+  DISMISSED = 'DISMISSED',
+  OTHER = 'OTHER',
+}
+
+export interface DisputeEvidence {
+  id: string
+  disputeId: string
+  fileName: string
+  fileType: string
+  fileData: string
+  description?: string | null
+  uploadedById: string
+  uploadedBy?: { id: string; firstName: string; lastName: string }
+  createdAt: string
+}
+
+export interface Dispute {
+  id: string
+  tenantId: string
+  bookingId?: string | null
+  booking?: Booking & { service?: Service }
+  invoiceId?: string | null
+  invoice?: Invoice | null
+  customerId: string
+  customer?: { id: string; firstName: string; lastName: string; email?: string; phone?: string }
+  type: DisputeType
+  status: DisputeStatus
+  description: string
+  amount: number
+  resolution?: DisputeResolution | null
+  resolutionNote?: string | null
+  resolvedById?: string | null
+  resolvedBy?: { id: string; firstName: string; lastName: string } | null
+  resolvedAt?: string | null
+  createdAt: string
+  updatedAt: string
+  evidence?: DisputeEvidence[]
 }

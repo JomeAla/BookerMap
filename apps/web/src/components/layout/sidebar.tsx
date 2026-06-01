@@ -29,6 +29,11 @@ import {
   Moon,
   Percent,
   AlertCircle,
+  Key,
+  DollarSign,
+  Smile,
+  GitFork,
+  ShieldAlert,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
@@ -41,14 +46,19 @@ const navItems = [
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/invoices', label: 'Invoices', icon: FileText },
   { href: '/split-payments', label: 'Split Payments', icon: Percent },
+  { href: '/settlements', label: 'Settlements', icon: DollarSign },
   { href: '/dispatches', label: 'Dispatches', icon: Truck },
   { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/inventory', label: 'Inventory', icon: Package },
+  { href: '/satisfaction', label: 'Satisfaction', icon: Smile },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/ai/history', label: 'AI History', icon: Bot },
+  { href: '/ai/flows', label: 'Flow Builder', icon: GitFork },
   { href: '/ai/escalations', label: 'Escalations', icon: AlertCircle },
+  { href: '/disputes', label: 'Disputes', icon: ShieldAlert },
   { href: '/marketing', label: 'Marketing', icon: Megaphone },
   { href: '/settings/subscription', label: 'Subscription', icon: CreditCard },
+  { href: '/settings/api-keys', label: 'API Keys', icon: Key },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
@@ -64,6 +74,20 @@ export function Sidebar() {
       try {
         const { data } = await api.get('/ai/escalations/stats/open-count')
         return data.data?.count ?? 0
+      } catch {
+        return 0
+      }
+    },
+    refetchInterval: 15000,
+    enabled: !!user && ['ADMIN', 'MANAGER', 'OWNER'].includes(user.role),
+  })
+
+  const { data: disputeOpenCount } = useQuery({
+    queryKey: ['dispute-open-count'],
+    queryFn: async () => {
+      try {
+        const { data } = await api.get('/disputes/stats')
+        return data.data?.openCount ?? 0
       } catch {
         return 0
       }
@@ -128,6 +152,16 @@ export function Sidebar() {
                 {!collapsed && (
                   <span className="flex items-center gap-2">
                     <span>{item.label}</span>
+                  {item.href === '/disputes' && disputeOpenCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] flex items-center justify-center px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                      {disputeOpenCount > 99 ? '99+' : disputeOpenCount}
+                    </span>
+                  )}
+                    {item.href === '/disputes' && disputeOpenCount > 0 && (
+                      <span className="h-5 min-w-[20px] flex items-center justify-center px-1.5 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                        {disputeOpenCount > 99 ? '99+' : disputeOpenCount}
+                      </span>
+                    )}
                     {item.href === '/ai/escalations' && escalationCount > 0 && (
                       <span className="h-5 min-w-[20px] flex items-center justify-center px-1.5 text-[10px] font-bold text-white bg-red-500 rounded-full">
                         {escalationCount > 99 ? '99+' : escalationCount}

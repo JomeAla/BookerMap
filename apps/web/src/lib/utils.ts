@@ -63,6 +63,7 @@ export function getStatusColor(status: string): string {
     ASSIGNED: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
     EN_ROUTE: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
     STARTED: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
+    PROCESSING: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
   }
   return map[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
 }

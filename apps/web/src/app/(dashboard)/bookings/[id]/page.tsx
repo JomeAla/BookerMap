@@ -11,10 +11,14 @@ import { StatusBadge, Badge } from '@/components/ui/badge'
 import { PageLoader } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowLeft, User, Phone, Mail, Clock, Wrench, DollarSign, MapPin, Star, Package, Plus, Upload, Trash2, FileIcon } from 'lucide-react'
+import { ArrowLeft, User, Phone, Mail, Clock, Wrench, DollarSign, MapPin, Star, Package, Plus, Upload, Trash2, FileIcon, Navigation } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import type { Booking, Dispatch, Review, BookingInventory, InventoryItem, BookingFile } from '@/types'
+import dynamic from 'next/dynamic'
+import type { Booking, Dispatch, Review, BookingInventory, InventoryItem, BookingFile, LocationUpdate } from '@/types'
+import { JobStatus } from '@/types'
+
+const TechnicianTracker = dynamic(() => import('@/components/map/technician-tracker'), { ssr: false })
 
 export default function BookingDetailPage() {
   const params = useParams()
@@ -163,6 +167,24 @@ export default function BookingDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {(booking.dispatch?.status === JobStatus.EN_ROUTE || booking.dispatch?.status === JobStatus.STARTED) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Navigation className="h-4 w-4 text-blue-500" />
+              Live Tracking
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TechnicianTracker
+              bookingId={booking.id}
+              customerLat={booking.customer?.addresses?.[0]?.latitude}
+              customerLng={booking.customer?.addresses?.[0]?.longitude}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader><CardTitle className="text-base">Actions</CardTitle></CardHeader>

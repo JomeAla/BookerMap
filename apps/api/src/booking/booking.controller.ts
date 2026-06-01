@@ -8,6 +8,7 @@ import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { BookingService } from './booking.service';
 import { SchedulingService } from './scheduling.service';
 import { SplitPaymentService } from '../split-payment/split-payment.service';
+import { SatisfactionService } from '../satisfaction/satisfaction.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { RescheduleBookingDto } from './dto/reschedule-booking.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -23,6 +24,7 @@ export class BookingController {
     private readonly bookingService: BookingService,
     private readonly schedulingService: SchedulingService,
     private readonly splitPaymentService: SplitPaymentService,
+    private readonly satisfactionService: SatisfactionService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -114,6 +116,18 @@ export class BookingController {
         this.splitPaymentService.createSplitPayment(updated.id, inv.id)
           .catch(err => this.logger.error('Failed to create split payment', err));
       }
+    }
+
+    if (body.status === 'COMPLETED') {
+      this.satisfactionService.recordSurvey(tenantId, {
+        bookingId: id,
+        customerId: updated.customerId,
+        touchpoint: 'SERVICE_COMPLETED',
+        score: 5,
+        scoreType: 'CSAT',
+      }).catch(err => this.logger.error('Failed to record auto survey', err));
+
+      this.logger.log(`Satisfaction survey triggered for booking ${id}`);
     }
 
     return { success: true, data: updated };

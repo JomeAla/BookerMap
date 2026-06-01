@@ -9,6 +9,9 @@ import { Spinner } from '@/components/ui/spinner'
 import { MessageSquare, Send, Loader2, AlertCircle, X } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { AiConversation, AiMessage } from '@/types'
+import { VoiceInputButton } from '@/components/chat/voice-input-button'
+import { VoiceOutputToggle } from '@/components/chat/voice-output-toggle'
+import { getSpeechService } from '@/lib/speech-service'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -24,6 +27,7 @@ export default function AiChatPage() {
   const [conversationId, setConversationId] = React.useState<string | null>(null)
   const [escalationStatus, setEscalationStatus] = React.useState<string | null>(null)
   const [escalating, setEscalating] = React.useState(false)
+  const [voiceOutputEnabled, setVoiceOutputEnabled] = React.useState(false)
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
@@ -40,8 +44,36 @@ export default function AiChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  React.useEffect(() => {
+    try {
+      const stored = localStorage.getItem('bm_voice_output_enabled')
+      setVoiceOutputEnabled(stored === 'true')
+    } catch {}
+  }, [])
+
+  React.useEffect(() => {
+    if (messages.length > 0) {
+      const last = messages[messages.length - 1]
+      if (last.role === 'assistant' && voiceOutputEnabled && !loading) {
+        const service = getSpeechService()
+        service.stopSpeaking()
+        window.setTimeout(() => {
+          service.speak(last.content)
+        }, 100)
+      }
+    }
+  }, [messages, voiceOutputEnabled, loading])
+
+  React.useEffect(() => {
+    return () => {
+      try { getSpeechService().stopSpeaking() } catch {}
+    }
+  }, [])
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return
+
+    getSpeechService().stopSpeaking()
 
     const userMessage: Message = { role: 'user', content: text.trim() }
     setMessages((prev) => [...prev, userMessage])
@@ -122,6 +154,7 @@ export default function AiChatPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <VoiceOutputToggle />
           {conversationId && !escalationStatus && (
             <Button
               variant="outline"
@@ -205,6 +238,7 @@ export default function AiChatPage() {
             disabled={loading}
             className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
           />
+          <VoiceInputButton onResult={(text) => setInput((prev) => prev + text)} disabled={loading} />
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || loading}

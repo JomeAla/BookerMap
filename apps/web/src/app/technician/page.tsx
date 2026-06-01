@@ -10,9 +10,10 @@ import { Badge, StatusBadge } from '@/components/ui/badge'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { ToastProvider, useToast } from '@/components/ui/toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Wrench, MapPin, Clock, User, CheckCircle, Play, XCircle, Navigation } from 'lucide-react'
-import { type Dispatch, type Booking, JobStatus } from '@/types'
+import { Wrench, MapPin, Clock, User, CheckCircle, Play, XCircle, Navigation, Crosshair } from 'lucide-react'
+import { type Dispatch, type Booking, JobStatus, type LocationUpdate } from '@/types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useLocationSocket } from '@/components/providers/socket-provider'
 
 const statusActions: { status: JobStatus; label: string; icon: React.ReactNode; variant?: 'default' | 'outline' | 'destructive' }[] = [
   { status: JobStatus.EN_ROUTE, label: 'En Route', icon: <Navigation className="h-4 w-4" /> },
@@ -24,6 +25,71 @@ const statusActions: { status: JobStatus; label: string; icon: React.ReactNode; 
 function TechnicianContent() {
   const queryClient = useQueryClient()
   const { addToast } = useToast()
+  const locationSocketRef = useLocationSocket()
+
+  const [sharingBookingId, setSharingBookingId] = React.useState<string | null>(null)
+  const [locationError, setLocationError] = React.useState<string | null>(null)
+  const watchIdRef = React.useRef<number | null>(null)
+  const [currentLat, setCurrentLat] = React.useState<number | null>(null)
+  const [currentLng, setCurrentLng] = React.useState<number | null>(null)
+
+  const stopSharing = React.useCallback(() => {
+    if (watchIdRef.current != null) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
+    }
+    setSharingBookingId(null)
+    setCurrentLat(null)
+    setCurrentLng(null)
+    setLocationError(null)
+  }, [])
+
+  const startSharing = React.useCallback((bookingId: string, tenantId?: string) => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation not supported')
+      return
+    }
+    stopSharing()
+    setSharingBookingId(bookingId)
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude, accuracy, speed, heading } = position.coords
+        setCurrentLat(latitude)
+        setCurrentLng(longitude)
+        const ws = locationSocketRef?.current
+        if (ws?.connected) {
+          ws.emit('updateLocation', {
+            latitude,
+            longitude,
+            accuracy: accuracy ?? undefined,
+            speed: speed ?? undefined,
+            heading: heading ?? undefined,
+            bookingId,
+            userId: 'current',
+            tenantId: tenantId || '',
+          })
+        } else {
+          api.post('/locations/update', {
+            userId: 'current',
+            bookingId,
+            latitude,
+            longitude,
+            accuracy: accuracy ?? undefined,
+            speed: speed ?? undefined,
+            heading: heading ?? undefined,
+          }).catch(() => {})
+        }
+      },
+      (err) => {
+        setLocationError(`Location error: ${err.message}`)
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+    )
+  }, [locationSocketRef, stopSharing])
+
+  React.useEffect(() => {
+    return () => { stopSharing() }
+  }, [stopSharing])
 
   const { data: todayJobs, isLoading: isLoadingToday } = useQuery({
     queryKey: ['technician-today-jobs'],
@@ -48,10 +114,16 @@ function TechnicianContent() {
       const { data } = await api.patch(`/technician/jobs/${dispatchId}`, { status })
       return data.data
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['technician-today-jobs'] })
       queryClient.invalidateQueries({ queryKey: ['technician-available-jobs'] })
       addToast('Job status updated', 'success')
+      if (variables.status === JobStatus.EN_ROUTE || variables.status === JobStatus.STARTED) {
+        startSharing(variables.dispatchId)
+      }
+      if (variables.status === JobStatus.COMPLETED || variables.status === JobStatus.CANCELLED) {
+        stopSharing()
+      }
     },
     onError: () => addToast('Failed to update job', 'error'),
   })
@@ -94,6 +166,7 @@ function TechnicianContent() {
               {todayJobs.map((dispatch) => {
                 const booking = dispatch.booking
                 const customer = booking?.customer
+                const isSharing = sharingBookingId === dispatch.id
                 return (
                   <Card key={dispatch.id}>
                     <CardContent className="p-4">
@@ -102,6 +175,12 @@ function TechnicianContent() {
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold text-gray-900 dark:text-white">{booking?.service?.name}</h3>
                             <StatusBadge status={dispatch.status} />
+                            {isSharing && (
+                              <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1">
+                                <Crosshair className="h-3 w-3" />
+                                Sharing Location
+                              </Badge>
+                            )}
                           </div>
                           <div className="flex flex-wrap gap-4 text-sm text-gray-500">
                             <span className="flex items-center gap-1">
@@ -116,14 +195,29 @@ function TechnicianContent() {
                               <MapPin className="h-4 w-4" />
                               {customer?.addresses?.[0]?.street || 'Address not available'}
                             </span>
+                            {isSharing && currentLat != null && (
+                              <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                                <Navigation className="h-4 w-4" />
+                                {currentLat.toFixed(4)}, {currentLng?.toFixed(4)}
+                              </span>
+                            )}
                           </div>
                           {booking?.notes && (
                             <p className="text-sm text-gray-500 italic bg-gray-50 dark:bg-gray-800 p-2 rounded">
                               Note: {booking.notes}
                             </p>
                           )}
+                          {isSharing && locationError && (
+                            <p className="text-sm text-red-500">{locationError}</p>
+                          )}
                         </div>
                         <div className="flex flex-col gap-2 ml-4">
+                          {isSharing && (
+                            <Button size="sm" variant="outline" onClick={stopSharing}>
+                              <Crosshair className="h-4 w-4 mr-1" />
+                              Stop Sharing
+                            </Button>
+                          )}
                           {statusActions.map((action) => {
                             if (action.status === dispatch.status || dispatch.status === 'COMPLETED' || dispatch.status === 'CANCELLED') return null
                             return (

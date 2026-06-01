@@ -15,6 +15,15 @@ export class PublicService {
     return tenant;
   }
 
+  async getTenantById(id: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id },
+      select: { id: true, name: true, slug: true, logo: true, primaryColor: true, timezone: true, currency: true },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    return tenant;
+  }
+
   async getServices(tenantSlug: string) {
     const tenant = await this.prisma.tenant.findUnique({ where: { slug: tenantSlug } });
     if (!tenant) throw new NotFoundException('Tenant not found');
@@ -26,12 +35,34 @@ export class PublicService {
     });
   }
 
+  async getServicesByTenantId(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    return this.prisma.service.findMany({
+      where: { tenantId, isActive: true },
+      select: { id: true, name: true, description: true, duration: true, price: true, priceType: true, imageUrl: true, categoryId: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   async getSlots(tenantSlug: string, serviceId: string, date: string) {
     const tenant = await this.prisma.tenant.findUnique({ where: { slug: tenantSlug } });
     if (!tenant) throw new NotFoundException('Tenant not found');
 
+    return this.getSlotsInternal(tenant.id, serviceId, date);
+  }
+
+  async getSlotsByTenantId(tenantId: string, serviceId: string, date: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    return this.getSlotsInternal(tenant.id, serviceId, date);
+  }
+
+  private async getSlotsInternal(tenantId: string, serviceId: string, date: string) {
     const service = await this.prisma.service.findFirst({
-      where: { id: serviceId, tenantId: tenant.id, isActive: true },
+      where: { id: serviceId, tenantId, isActive: true },
     });
     if (!service) throw new NotFoundException('Service not found');
 
@@ -43,7 +74,7 @@ export class PublicService {
 
     const bookings = await this.prisma.booking.findMany({
       where: {
-        tenantId: tenant.id,
+        tenantId,
         serviceId,
         startTime: { gte: new Date(`${date}T00:00:00.000Z`), lt: new Date(`${date}T23:59:59.999Z`) },
         status: { notIn: ['CANCELLED', 'NO_SHOW'] },
@@ -64,8 +95,19 @@ export class PublicService {
     const tenant = await this.prisma.tenant.findUnique({ where: { slug: tenantSlug } });
     if (!tenant) throw new NotFoundException('Tenant not found');
 
+    return this.createBookingInternal(tenant.id, dto);
+  }
+
+  async createBookingByTenantId(tenantId: string, dto: PublicCreateBookingDto) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    return this.createBookingInternal(tenant.id, dto);
+  }
+
+  private async createBookingInternal(tenantId: string, dto: PublicCreateBookingDto) {
     const service = await this.prisma.service.findFirst({
-      where: { id: dto.serviceId, tenantId: tenant.id, isActive: true },
+      where: { id: dto.serviceId, tenantId, isActive: true },
     });
     if (!service) throw new NotFoundException('Service not found');
 
@@ -74,7 +116,7 @@ export class PublicService {
 
     const conflict = await this.prisma.booking.findFirst({
       where: {
-        tenantId: tenant.id,
+        tenantId,
         serviceId: dto.serviceId,
         startTime: { lt: end },
         endTime: { gt: start },
@@ -84,13 +126,13 @@ export class PublicService {
     if (conflict) throw new BadRequestException('This time slot is no longer available');
 
     let customer = await this.prisma.customer.findFirst({
-      where: { tenantId: tenant.id, phone: dto.phone },
+      where: { tenantId, phone: dto.phone },
     });
 
     if (!customer) {
       customer = await this.prisma.customer.create({
         data: {
-          tenantId: tenant.id,
+          tenantId,
           firstName: dto.firstName,
           lastName: dto.lastName,
           email: dto.email,
@@ -101,7 +143,7 @@ export class PublicService {
 
     const booking = await this.prisma.booking.create({
       data: {
-        tenantId: tenant.id,
+        tenantId,
         serviceId: dto.serviceId,
         customerId: customer.id,
         locationId: dto.locationId || null,

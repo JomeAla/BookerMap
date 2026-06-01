@@ -5,6 +5,7 @@ import { InvoiceModule } from '../invoice/invoice.module';
 import { NotificationModule } from '../notification/notification.module';
 import { PaymentModule } from '../payment/payment.module';
 import { AiAgentController } from './ai-agent.controller';
+import { FlowController } from './flow.controller';
 import { ConversationEngine } from './services/conversation.engine';
 import { ResponseService } from './services/response.service';
 import { TaskExecutor } from './services/task-executor.service';
@@ -12,10 +13,11 @@ import { ChatService } from './services/chat.service';
 import { AnalyticsService } from './services/analytics.service';
 import { EscalationService } from './services/escalation.service';
 import { PaymentHandler } from './handlers/payment.handler';
+import { FlowService } from './services/flow.service';
 
 @Module({
   imports: [BookingModule, CustomerModule, InvoiceModule, NotificationModule, PaymentModule],
-  controllers: [AiAgentController],
+  controllers: [AiAgentController, FlowController],
   providers: [
     ConversationEngine,
     ResponseService,
@@ -24,7 +26,8 @@ import { PaymentHandler } from './handlers/payment.handler';
     AnalyticsService,
     EscalationService,
     PaymentHandler,
+    FlowService,
   ],
-  exports: [ChatService, AnalyticsService, EscalationService, PaymentHandler],
+  exports: [ChatService, AnalyticsService, EscalationService, PaymentHandler, FlowService],
 })
 export class AiAgentModule {}
