@@ -3,6 +3,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ConversationEngine } from './conversation.engine';
 import { ResponseService } from './response.service';
 import { TaskExecutor } from './task-executor.service';
+import { EscalationService } from './escalation.service';
+import { PaymentHandler } from '../handlers/payment.handler';
+import { detectPaymentIntent } from '../handlers/intent-detector';
 import { EntityMap, ConversationState, ChatResponse } from '../dto/chat-message.dto';
 
 @Injectable()
@@ -14,7 +17,18 @@ export class ChatService {
     private readonly engine: ConversationEngine,
     private readonly responseService: ResponseService,
     private readonly taskExecutor: TaskExecutor,
+    private readonly escalationService: EscalationService,
+    private readonly paymentHandler: PaymentHandler,
   ) {}
+
+  private readonly escalationKeywords = [
+    'human', 'agent', 'real person', 'talk to someone', 'speak to a person',
+    'customer service', 'representative', 'manager', 'speak to human',
+    'talk to human', 'real agent', 'connect me', 'transfer me',
+  ];
+
+  private readonly fallbackThreshold = 2;
+  private fallbackCounts = new Map<string, number>();
 
   async processMessage(
     message: string,
@@ -28,7 +42,88 @@ export class ChatService {
 
     await this.saveMessage(convId, 'user', message, context.intent, context.entities);
 
-    if (message.toLowerCase() === 'yes' && context.intent === 'BOOKING_CREATE' && context.step === 99) {
+    const lowerMsg = message.toLowerCase();
+
+    const wantsHuman = this.escalationKeywords.some(kw => lowerMsg.includes(kw));
+    if (wantsHuman) {
+      await this.escalationService.escalate(convId, tenantId, undefined, message, undefined);
+      const reply = "I understand you'd like to speak with a human agent. I've submitted your request and one of our team members will be with you shortly. Thank you for your patience!";
+      context = this.createNewContext();
+      this.contexts.set(convId, context);
+      await this.saveMessage(convId, 'assistant', reply, 'ESCALATE', {});
+      return { reply, intent: 'ESCALATE', entities: context.entities, conversationId: convId };
+    }
+
+    if (context.intent === 'PAYMENT_INQUIRY' && context.step === 50) {
+      const paymentDetect = detectPaymentIntent(message);
+
+      if (paymentDetect.type === 'PAYMENT_CONFIRM' || paymentDetect.type === 'PAYMENT_INTENT') {
+        const handlerResult = await this.paymentHandler.handlePaymentIntent({
+          tenantId,
+          phone: context.entities.phone,
+          email: context.entities.email,
+          amount: paymentDetect.amount,
+          invoiceNumber: paymentDetect.invoiceNumber,
+        });
+
+        if (handlerResult.success) {
+          const reply = handlerResult.message;
+          context = this.createNewContext();
+          this.contexts.set(convId, context);
+          await this.saveMessage(convId, 'assistant', reply, 'PAYMENT_INTENT', {});
+          return {
+            reply,
+            intent: 'PAYMENT_INTENT',
+            entities: {},
+            conversationId: convId,
+            paymentAction: {
+              type: 'pay_now',
+              paymentLink: handlerResult.data?.authorizationUrl,
+              reference: handlerResult.data?.reference,
+              invoiceNumber: handlerResult.data?.invoiceNumber,
+              amount: handlerResult.data?.amount,
+              currency: handlerResult.data?.currency || 'NGN',
+              invoiceId: handlerResult.data?.invoiceId,
+            },
+          };
+        }
+
+        const reply = handlerResult.message;
+        context = this.createNewContext();
+        this.contexts.set(convId, context);
+        await this.saveMessage(convId, 'assistant', reply, 'PAYMENT_INTENT', {});
+        return { reply, intent: 'PAYMENT_INTENT', entities: {}, conversationId: convId };
+      }
+
+      const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+      if (paymentDetect.type === 'PAYMENT_DECLINE') {
+        context = this.createNewContext();
+        this.contexts.set(convId, context);
+        const reply = "No problem! Let me know if you need anything else.";
+        await this.saveMessage(convId, 'assistant', reply, 'FALLBACK', {});
+        return {
+          reply,
+          intent: 'FALLBACK',
+          entities: {},
+          conversationId: convId,
+          quickReplies: ['Book a service', 'Check my booking', 'See prices'],
+        };
+      }
+
+      context = this.createNewContext();
+      this.contexts.set(convId, context);
+      const pendingMsg = await this.responseService.getResponse('PAYMENT_PENDING', { businessName: tenant?.name || 'our business' }, tenantId);
+      await this.saveMessage(convId, 'assistant', pendingMsg, 'PAYMENT_INQUIRY', {});
+      return {
+        reply: pendingMsg,
+        intent: 'PAYMENT_INQUIRY',
+        entities: {},
+        conversationId: convId,
+        quickReplies: ['Pay Now', 'Not now'],
+      };
+    }
+
+    if (lowerMsg === 'yes' && context.intent === 'BOOKING_CREATE' && context.step === 99) {
       if (context.entities.date && context.entities.time) {
         const hoursCheck = await this.isWithinBusinessHours(context.entities.date, context.entities.time, tenantId);
         if (!hoursCheck.ok) {
@@ -186,6 +281,20 @@ export class ChatService {
       }
 
       const reply = await this.buildResultResponse(intent, result, entities, tenantId);
+
+      if (intent === 'PAYMENT_INQUIRY' && result.success && result.data?.invoices?.length > 0) {
+        context.step = 50;
+        this.contexts.set(convId, context);
+        await this.saveMessage(convId, 'assistant', reply, intent, entities);
+        return {
+          reply,
+          intent,
+          entities: context.entities,
+          conversationId: convId,
+          quickReplies: ['Pay Now', 'Not now'],
+        };
+      }
+
       context = this.createNewContext();
       this.contexts.set(convId, context);
       await this.saveMessage(convId, 'assistant', reply, intent, entities);
@@ -194,6 +303,18 @@ export class ChatService {
 
     context = this.createNewContext();
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+
+    const currentFallbackCount = (this.fallbackCounts.get(convId) || 0) + 1;
+    this.fallbackCounts.set(convId, currentFallbackCount);
+
+    if (currentFallbackCount >= this.fallbackThreshold) {
+      this.fallbackCounts.delete(convId);
+      const reply = "I'm having trouble understanding your request. Would you like me to connect you with a human agent who can assist you further?";
+      this.contexts.set(convId, context);
+      await this.saveMessage(convId, 'assistant', reply, 'FALLBACK', entities);
+      return { reply, intent: 'FALLBACK', entities, conversationId: convId, quickReplies: ['Yes, connect me', 'No, I\'ll try again'] };
+    }
+
     const reply = await this.responseService.getVariedResponse('FALLBACK', { businessName: tenant?.name || 'our business' }, tenantId);
     this.contexts.set(convId, context);
     await this.saveMessage(convId, 'assistant', reply, 'FALLBACK', entities);

@@ -12,11 +12,12 @@ import type { Booking } from '@/types'
 interface WeekViewProps {
   currentDate: Date
   bookings: Booking[]
+  onSlotClick?: (date: Date, time?: string) => void
 }
 
 const HOURS = Array.from({ length: 10 }, (_, i) => i + 7)
 
-export function WeekView({ currentDate, bookings }: WeekViewProps) {
+export function WeekView({ currentDate, bookings, onSlotClick }: WeekViewProps) {
   const router = useRouter()
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 })
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 })
@@ -76,13 +77,18 @@ export function WeekView({ currentDate, bookings }: WeekViewProps) {
               }`}
             >
               {HOURS.map((hour: number) => (
-                <div key={hour} className="h-[60px] border-b border-gray-100 dark:border-gray-800" />
+                <div
+                  key={hour}
+                  onClick={() => onSlotClick?.(day, `${String(hour).padStart(2, '0')}:00`)}
+                  className="h-[60px] border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors"
+                />
               ))}
               {dayBookings.map((booking) => {
                 const style = getBookingStyle(booking)
                 return (
                   <div
                     key={booking.id}
+                    data-booking
                     onClick={() => router.push(`/bookings/${booking.id}`)}
                     className={`absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-xs overflow-hidden cursor-pointer border border-white/20 ${getStatusColor(booking.status)}`}
                     style={{ top: style.top, height: style.height }}

@@ -13,9 +13,10 @@ interface MonthViewProps {
   currentDate: Date
   bookings: Booking[]
   onDateChange: (date: Date) => void
+  onSlotClick?: (date: Date, time?: string) => void
 }
 
-export function MonthView({ currentDate, bookings, onDateChange }: MonthViewProps) {
+export function MonthView({ currentDate, bookings, onDateChange, onSlotClick }: MonthViewProps) {
   const router = useRouter()
   const monthStart = startOfMonth(currentDate)
   const monthEnd = endOfMonth(currentDate)
@@ -42,7 +43,12 @@ export function MonthView({ currentDate, bookings, onDateChange }: MonthViewProp
           return (
             <div
               key={idx}
-              onClick={() => onDateChange(day)}
+              onClick={(e) => {
+                const target = e.target as HTMLElement
+                if (target.closest('[data-booking]')) return
+                if (onSlotClick) onSlotClick(day, '09:00')
+                else onDateChange(day)
+              }}
               className={`min-h-[100px] p-1.5 border-r border-b border-gray-200 dark:border-gray-700 last:border-r-0 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50 ${
                 !isSameMonth(day, currentDate) ? 'bg-gray-50 dark:bg-gray-800/50' : ''
               }`}
@@ -56,6 +62,7 @@ export function MonthView({ currentDate, bookings, onDateChange }: MonthViewProp
                 {dayBookings.slice(0, 3).map((booking) => (
                   <div
                     key={booking.id}
+                    data-booking
                     onClick={(e) => { e.stopPropagation(); router.push(`/bookings/${booking.id}`) }}
                     className={`text-xs px-1.5 py-0.5 rounded truncate cursor-pointer ${getStatusColor(booking.status)}`}
                     title={`${booking.customer?.firstName} ${booking.customer?.lastName} - ${booking.service?.name} - ${format(new Date(booking.startTime), 'h:mm a')}`}

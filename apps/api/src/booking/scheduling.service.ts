@@ -91,4 +91,44 @@ export class SchedulingService {
     });
     return !!conflicting;
   }
+
+  async checkSlotAvailability(
+    bookingId: string,
+    tenantId: string,
+    newStart: Date,
+    newEnd: Date,
+  ): Promise<{ available: boolean; conflicts: Array<{ bookingId: string; customerName: string; serviceName: string; startTime: Date; endTime: Date }> }> {
+    const booking = await this.prisma.booking.findFirst({
+      where: { id: bookingId, tenantId },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    const conflicts: Array<{ bookingId: string; customerName: string; serviceName: string; startTime: Date; endTime: Date }> = [];
+
+    if (booking.technicianId) {
+      const bufferMs = 30 * 60 * 1000;
+      const conflicting = await this.prisma.booking.findMany({
+        where: {
+          technicianId: booking.technicianId,
+          id: { not: bookingId },
+          status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+          startTime: { lt: new Date(newEnd.getTime() + bufferMs) },
+          endTime: { gt: new Date(newStart.getTime() - bufferMs) },
+        },
+        include: { customer: true, service: true },
+      });
+
+      for (const b of conflicting) {
+        conflicts.push({
+          bookingId: b.id,
+          customerName: b.customer ? `${b.customer.firstName} ${b.customer.lastName}` : 'Unknown',
+          serviceName: b.service?.name || 'Unknown',
+          startTime: b.startTime,
+          endTime: b.endTime,
+        });
+      }
+    }
+
+    return { available: conflicts.length === 0, conflicts };
+  }
 }

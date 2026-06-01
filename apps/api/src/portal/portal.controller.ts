@@ -1,5 +1,6 @@
 import { Controller, Get, Patch, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { PortalService } from './portal.service';
 import { UpdatePortalProfileDto } from './dto/update-portal-profile.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -7,6 +8,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('Customer Portal')
 @ApiBearerAuth()
+@Throttle({ default: { limit: 30, ttl: 60000 } })
 @Controller('portal')
 @UseGuards(JwtAuthGuard)
 export class PortalController {

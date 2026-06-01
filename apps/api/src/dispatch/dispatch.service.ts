@@ -31,6 +31,7 @@ export class DispatchService {
 
     return this.prisma.dispatch.create({
       data: {
+        tenantId,
         bookingId: dto.bookingId,
         assignedToId: dto.assignedToId,
         status: 'ASSIGNED',
@@ -111,40 +112,150 @@ export class DispatchService {
     });
   }
 
-  async autoAssign(bookingId: string) {
-    const booking = await this.prisma.booking.findUnique({
-      where: { id: bookingId },
-      select: { id: true, tenantId: true, serviceId: true, startTime: true, technicianId: true },
-    });
-    if (!booking) throw new NotFoundException('Booking not found');
+    async autoAssign(bookingId: string) {
+        const booking = await this.prisma.booking.findUnique({
+            where: { id: bookingId },
+            select: { id: true, tenantId: true, serviceId: true, startTime: true, technicianId: true },
+        });
+        if (!booking) throw new NotFoundException('Booking not found');
 
-    const existing = await this.prisma.dispatch.findUnique({ where: { bookingId } });
-    if (existing) {
-      this.logger.warn(`Dispatch already exists for booking ${bookingId}`);
-      return existing;
+        const existing = await this.prisma.dispatch.findUnique({ where: { bookingId } });
+        if (existing) {
+            this.logger.warn(`Dispatch already exists for booking ${bookingId}`);
+            return existing;
+        }
+
+        const technicianId = await this.autoAssignmentService.findBestTechnician({
+            serviceId: booking.serviceId,
+            dateTime: booking.startTime,
+            tenantId: booking.tenantId,
+        });
+
+        if (!technicianId) {
+            this.logger.warn(`Could not auto-assign technician for booking ${bookingId}`);
+            return null;
+        }
+
+        return this.prisma.dispatch.create({
+            data: {
+                tenantId: booking.tenantId,
+                bookingId,
+                assignedToId: technicianId,
+                status: 'ASSIGNED',
+            },
+            include: {
+                booking: { include: { customer: true, service: true } },
+                assignedTo: true,
+            },
+        });
     }
 
-    const technicianId = await this.autoAssignmentService.findBestTechnician({
-      serviceId: booking.serviceId,
-      dateTime: booking.startTime,
-      tenantId: booking.tenantId,
-    });
+    async offerJob(tenantId: string, bookingId: string, technicianIds: string[]) {
+        // Check if booking exists and belongs to tenant
+        const booking = await this.prisma.booking.findFirst({
+            where: { id: bookingId, tenantId },
+        });
+        if (!booking) throw new NotFoundException('Booking not found');
 
-    if (!technicianId) {
-      this.logger.warn(`Could not auto-assign technician for booking ${bookingId}`);
-      return null;
+        // Check if dispatch already exists
+        const existingDispatch = await this.prisma.dispatch.findUnique({ where: { bookingId } });
+        if (existingDispatch) {
+            // If dispatch exists, update it to offered status
+            return this.prisma.dispatch.update({
+                where: { id: existingDispatch.id },
+                data: {
+                    status: 'OFFERED',
+                    offeredAt: new Date(),
+                    assignedToId: null, // Clear assignment when offering
+                },
+                include: {
+                    booking: { include: { customer: true, service: true } },
+                    assignedTo: true,
+                },
+            });
+        }
+
+        // Create new dispatch with OFFERED status
+        return this.prisma.dispatch.create({
+            data: {
+                bookingId,
+                tenantId,
+                status: 'OFFERED',
+                offeredAt: new Date(),
+            },
+            include: {
+                booking: { include: { customer: true, service: true } },
+                assignedTo: true,
+            },
+        });
     }
 
-    return this.prisma.dispatch.create({
-      data: {
-        bookingId,
-        assignedToId: technicianId,
-        status: 'ASSIGNED',
-      },
-      include: {
-        booking: { include: { customer: true, service: true } },
-        assignedTo: true,
-      },
-    });
-  }
+    async acceptJob(tenantId: string, dispatchId: string, technicianId: string) {
+        // Verify dispatch exists and belongs to tenant
+        const dispatch = await this.prisma.dispatch.findFirst({
+            where: { id: dispatchId, booking: { tenantId } },
+            include: {
+                booking: { include: { customer: true, service: true } },
+                assignedTo: true,
+            },
+        });
+        if (!dispatch) throw new NotFoundException('Dispatch not found');
+
+        // Verify technician exists and belongs to tenant
+        const technician = await this.prisma.user.findFirst({
+            where: { id: technicianId, tenantId, role: 'TECHNICIAN' },
+        });
+        if (!technician) throw new NotFoundException('Technician not found');
+
+        // Check if dispatch is in OFFERED status
+        if (dispatch.status !== 'OFFERED') {
+            throw new BadRequestException('Job is not in offered status');
+        }
+
+        // Accept the job
+        return this.prisma.dispatch.update({
+            where: { id: dispatchId },
+            data: {
+                status: 'ACCEPTED',
+                acceptedAt: new Date(),
+                assignedToId: technicianId,
+            },
+            include: {
+                booking: { include: { customer: true, service: true } },
+                assignedTo: true,
+            },
+        });
+    }
+
+    async getAvailableJobs(tenantId: string, technicianId?: string) {
+        if (technicianId) {
+            // Get jobs offered to specific technician
+            // This would require a many-to-many relationship between dispatches and technicians for offers
+            // For now, we'll return all offered jobs (simplified implementation)
+            return this.prisma.dispatch.findMany({
+                where: {
+                    booking: { tenantId },
+                    status: 'OFFERED',
+                },
+                include: {
+                    booking: { include: { customer: true, service: true } },
+                    assignedTo: true,
+                },
+                orderBy: { offeredAt: 'desc' },
+            });
+        } else {
+            // Get all offered jobs
+            return this.prisma.dispatch.findMany({
+                where: {
+                    booking: { tenantId },
+                    status: 'OFFERED',
+                },
+                include: {
+                    booking: { include: { customer: true, service: true } },
+                    assignedTo: true,
+                },
+                orderBy: { offeredAt: 'desc' },
+            });
+        }
+    }
 }

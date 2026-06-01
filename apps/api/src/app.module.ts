@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_FILTER, APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { TenantModule } from './tenant/tenant.module';
@@ -30,6 +31,7 @@ import { SubscriptionModule } from './subscription/subscription.module';
 import { MarketingModule } from './marketing/marketing.module';
 import { FilesModule } from './files/files.module';
 import { CommissionModule } from './commission/commission.module';
+import { SplitPaymentModule } from './split-payment/split-payment.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { CommonModule } from './common/common.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -38,6 +40,10 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 60,
+    }]),
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     CommonModule,
@@ -69,9 +75,11 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     MarketingModule,
     FilesModule,
     CommissionModule,
+    SplitPaymentModule,
     InventoryModule,
   ],
   providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },

@@ -9,12 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
+import { Badge, StatusBadge } from '@/components/ui/badge'
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
-import { Users, UserPlus, Shield, Clock, Send, X, Plus, DollarSign } from 'lucide-react'
-import type { User, UserRole } from '@/types'
+import { Users, UserPlus, Shield, Clock, Send, X, Plus, DollarSign, Wallet } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
+import type { User, UserRole, SplitPayment } from '@/types'
 
 const roleOptions = [
   { value: 'ADMIN', label: 'Admin' },
@@ -82,6 +83,24 @@ export default function TeamPage() {
   const [editingCommissionUser, setEditingCommissionUser] = React.useState<User | null>(null)
   const [commissionForm, setCommissionForm] = React.useState({ commissionRate: 0, commissionType: 'PERCENTAGE' })
 
+  const [earningsDialogOpen, setEarningsDialogOpen] = React.useState(false)
+  const [viewingEarningsUser, setViewingEarningsUser] = React.useState<User | null>(null)
+
+  const { data: providerEarnings } = useQuery({
+    queryKey: ['provider-earnings', viewingEarningsUser?.id],
+    queryFn: async () => {
+      const [summaryRes, paymentsRes] = await Promise.all([
+        api.get(`/split-payments/provider/${viewingEarningsUser!.id}/earnings`),
+        api.get(`/split-payments/provider/${viewingEarningsUser!.id}`),
+      ])
+      return {
+        summary: summaryRes.data.data as { totalEarned: number; pending: number; released: number; onHold: number; totalTransactions: number },
+        payments: paymentsRes.data.data.payments as SplitPayment[],
+      }
+    },
+    enabled: !!viewingEarningsUser && earningsDialogOpen,
+  })
+
   const openCommissionDialog = (member: User) => {
     setEditingCommissionUser(member)
     setCommissionForm({
@@ -89,6 +108,11 @@ export default function TeamPage() {
       commissionType: member.commissionType ?? 'PERCENTAGE',
     })
     setCommissionDialogOpen(true)
+  }
+
+  const openEarningsDialog = (member: User) => {
+    setViewingEarningsUser(member)
+    setEarningsDialogOpen(true)
   }
 
   const saveCommission = async () => {
@@ -417,6 +441,9 @@ export default function TeamPage() {
                             <Button variant="ghost" size="sm" onClick={() => openCommissionDialog(member)}>
                               <DollarSign className="h-3.5 w-3.5 mr-1" /> Commission
                             </Button>
+                            <Button variant="ghost" size="sm" onClick={() => openEarningsDialog(member)}>
+                              <Wallet className="h-3.5 w-3.5 mr-1" /> Earnings
+                            </Button>
                           </div>
                         )}
                       </TableCell>
@@ -428,6 +455,65 @@ export default function TeamPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={earningsDialogOpen} onOpenChange={setEarningsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Earnings — {viewingEarningsUser?.firstName} {viewingEarningsUser?.lastName}</DialogTitle>
+          </DialogHeader>
+          {!providerEarnings ? (
+            <div className="py-8 text-center text-gray-400">Loading...</div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Total Earned', value: formatCurrency(providerEarnings.summary.totalEarned), color: 'text-blue-600' },
+                  { label: 'Pending', value: formatCurrency(providerEarnings.summary.pending), color: 'text-orange-600' },
+                  { label: 'Released', value: formatCurrency(providerEarnings.summary.released), color: 'text-green-600' },
+                  { label: 'On Hold', value: formatCurrency(providerEarnings.summary.onHold), color: 'text-red-600' },
+                ].map((stat) => (
+                  <div key={stat.label} className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{stat.label}</p>
+                    <p className={`text-lg font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recent Split Payments</h4>
+                {providerEarnings.payments.length === 0 ? (
+                  <p className="text-sm text-gray-400">No payments yet</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Booking</TableHead>
+                          <TableHead>Total</TableHead>
+                          <TableHead>Your Share</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Date</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {providerEarnings.payments.slice(0, 10).map((sp) => (
+                          <TableRow key={sp.id}>
+                            <TableCell className="text-sm">{sp.booking?.service?.name ?? sp.bookingId.slice(0, 8)}</TableCell>
+                            <TableCell className="text-sm">{formatCurrency(sp.totalAmount)}</TableCell>
+                            <TableCell className="text-sm font-medium">{formatCurrency(sp.providerAmount)}</TableCell>
+                            <TableCell><StatusBadge status={sp.status} /></TableCell>
+                            <TableCell className="text-sm text-gray-500">{new Date(sp.createdAt).toLocaleDateString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Patch,
-  Body, Param, UseGuards,
+  Body, Param, Query, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -83,5 +83,37 @@ export class DispatchController {
   @ApiResponse({ status: 404, description: 'Booking not found' })
   autoAssign(@Param('bookingId') bookingId: string) {
     return this.dispatchService.autoAssign(bookingId);
+  }
+
+  @Post('offer')
+  @ApiOperation({ summary: 'Offer job to technicians', description: 'Offer a job to multiple technicians' })
+  @ApiResponse({ status: 201, description: 'Job offered' })
+  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  offerJob(@TenantId() tenantId: string, @Body() body: { bookingId: string; technicianIds: string[] }) {
+    return this.dispatchService.offerJob(tenantId, body.bookingId, body.technicianIds);
+  }
+
+  @Post(':id/accept')
+  @ApiOperation({ summary: 'Accept job offer', description: 'Technician accepts a job offer' })
+  @ApiParam({ name: 'id', type: String, description: 'Dispatch ID' })
+  @ApiResponse({ status: 200, description: 'Job accepted' })
+  @ApiResponse({ status: 400, description: 'Job not in offered status' })
+  @ApiResponse({ status: 404, description: 'Dispatch not found' })
+  acceptJob(@TenantId() tenantId: string, @Param('id') dispatchId: string, @Body() body: { technicianId: string }) {
+    return this.dispatchService.acceptJob(tenantId, dispatchId, body.technicianId);
+  }
+
+  @Get('available')
+  @ApiOperation({ summary: 'Get available jobs', description: 'Get all offered jobs or jobs offered to specific technician' })
+  @ApiResponse({ status: 200, description: 'List of available jobs' })
+  getAvailableJobs(@TenantId() tenantId: string, @Query('technicianId') technicianId?: string) {
+    return this.dispatchService.getAvailableJobs(tenantId, technicianId);
+  }
+
+  @Get('my-offers')
+  @ApiOperation({ summary: 'Get my job offers', description: 'Get jobs offered to current technician' })
+  @ApiResponse({ status: 200, description: 'List of job offers for technician' })
+  getMyOffers(@TenantId() tenantId: string, @Body() body: { technicianId: string }) {
+    return this.dispatchService.getAvailableJobs(tenantId, body.technicianId);
   }
 }

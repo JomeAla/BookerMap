@@ -92,6 +92,14 @@ export class InvoiceController {
     return this.invoiceService.markAsPaid(tenantId, id);
   }
 
+  @Get(':id/payments')
+  @ApiOperation({ summary: 'Get invoice payments', description: 'Returns all payments for an invoice' })
+  @ApiParam({ name: 'id', type: String, description: 'Invoice ID' })
+  @ApiResponse({ status: 200, description: 'List of payments' })
+  getPayments(@TenantId() tenantId: string, @Param('id') id: string) {
+    return this.invoiceService.getInvoicePayments(tenantId, id);
+  }
+
   @Get(':id/pdf')
   @ApiOperation({ summary: 'Download invoice PDF', description: 'Download an invoice as a PDF file' })
   @ApiParam({ name: 'id', type: String, description: 'Invoice ID' })

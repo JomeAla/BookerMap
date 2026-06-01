@@ -9,11 +9,12 @@ import type { Booking } from '@/types'
 interface DayViewProps {
   currentDate: Date
   bookings: Booking[]
+  onSlotClick?: (date: Date, time?: string) => void
 }
 
 const HOURS = Array.from({ length: 10 }, (_, i) => i + 7)
 
-export function DayView({ currentDate, bookings }: DayViewProps) {
+export function DayView({ currentDate, bookings, onSlotClick }: DayViewProps) {
   const router = useRouter()
   const dayBookings = bookings.filter((b) => isSameDay(new Date(b.startTime), currentDate))
 
@@ -49,12 +50,19 @@ export function DayView({ currentDate, bookings }: DayViewProps) {
                 {format(new Date().setHours(hour, 0, 0, 0), 'h:mm a')}
               </div>
               <div className="flex-1 py-1 px-2 space-y-1">
+                {hourBookings.length === 0 && (
+                  <div
+                    onClick={() => onSlotClick?.(currentDate, `${String(hour).padStart(2, '0')}:00`)}
+                    className="h-full min-h-[60px] cursor-pointer hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors rounded"
+                  />
+                )}
                 {hourBookings.map((booking) => {
                   const start = format(new Date(booking.startTime), 'h:mm a')
                   const end = format(new Date(booking.endTime), 'h:mm a')
                   return (
                     <div
                       key={booking.id}
+                      data-booking
                       onClick={() => router.push(`/bookings/${booking.id}`)}
                       className={`rounded px-3 py-2 cursor-pointer transition-colors hover:opacity-80 ${getStatusColor(booking.status)}`}
                     >

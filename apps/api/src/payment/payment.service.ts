@@ -112,6 +112,47 @@ export class PaymentService {
     return payment;
   }
 
+  async handlePaymentSuccess(paymentId: string, invoiceId: string, tenantId: string, providerData?: any) {
+    const payment = await this.prisma.payment.findUnique({ where: { id: paymentId } });
+    if (!payment) throw new HttpException('Payment not found', 404);
+    if (payment.status === 'SUCCESS') return payment;
+
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: 'SUCCESS',
+        providerData: providerData || undefined,
+      },
+    });
+
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id: invoiceId },
+    });
+    if (!invoice) throw new HttpException('Invoice not found', 404);
+
+    const newPaidAmount = invoice.paidAmount + payment.amount;
+    const isFullyPaid = newPaidAmount >= invoice.total;
+
+    await this.prisma.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        paidAmount: newPaidAmount,
+        status: isFullyPaid ? 'PAID' : 'PARTIALLY_PAID',
+        paidAt: isFullyPaid ? new Date() : undefined,
+      },
+    });
+
+    this.logger.log(
+      `Payment ${paymentId}: ${payment.amount} applied to invoice ${invoiceId}. ` +
+      `Paid: ${newPaidAmount}/${invoice.total} (${isFullyPaid ? 'Fully Paid' : 'Partial'})`,
+    );
+
+    return this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: { invoice: true },
+    });
+  }
+
   async refundPayment(paymentId: string, amount: number | undefined, tenantId: string): Promise<any> {
     const payment = await this.prisma.payment.findFirst({
       where: { id: paymentId, invoice: { tenantId } },
@@ -130,9 +171,17 @@ export class PaymentService {
     });
 
     if (newStatus === 'REFUNDED') {
+      const invoice = await this.prisma.invoice.findUnique({
+        where: { id: payment.invoiceId },
+      });
+      const newPaidAmount = Math.max(0, (invoice?.paidAmount || 0) - payment.amount);
       await this.prisma.invoice.update({
         where: { id: payment.invoiceId },
-        data: { status: 'REFUNDED' },
+        data: {
+          status: newPaidAmount <= 0 ? 'SENT' : 'PARTIALLY_PAID',
+          paidAmount: newPaidAmount,
+          paidAt: newPaidAmount <= 0 ? null : undefined,
+        },
       });
     }
 

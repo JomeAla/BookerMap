@@ -180,7 +180,9 @@ export class BookingService {
     if (booking.status === 'COMPLETED') throw new BadRequestException('Cannot reschedule a completed booking');
 
     const newStart = new Date(dto.newStartTime);
-    const newEnd = new Date(newStart.getTime() + booking.service.duration * 60000);
+    const newEnd = dto.newEndTime
+      ? new Date(dto.newEndTime)
+      : new Date(newStart.getTime() + booking.service.duration * 60000);
 
     if (booking.technicianId) {
       const hasConflict = await this.schedulingService.checkConflicts(booking.technicianId, newStart, newEnd);

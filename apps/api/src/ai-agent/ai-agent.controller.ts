@@ -1,11 +1,13 @@
-import { Controller, Post, Get, Put, Body, Param, Query, Req, UseGuards, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Get, Put, Patch, Body, Param, Query, Req, UseGuards, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ChatService } from './services/chat.service';
 import { AnalyticsService } from './services/analytics.service';
+import { EscalationService } from './services/escalation.service';
 import { ChatMessageDto, CreateResponseDto } from './dto/chat-message.dto';
 import { AiSettingsDto } from './dto/ai-settings.dto';
+import { EscalateDto, AssignEscalationDto, ResolveEscalationDto, EscalationFilterDto } from './dto/escalation.dto';
 import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('AI Agent')
@@ -14,6 +16,7 @@ export class AiAgentController {
   constructor(
     private readonly chatService: ChatService,
     private readonly analyticsService: AnalyticsService,
+    private readonly escalationService: EscalationService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -121,6 +124,93 @@ export class AiAgentController {
   @ApiResponse({ status: 200, description: 'Failed conversations' })
   async getFailedConversations(@CurrentUser() user: any) {
     return this.analyticsService.getFailedConversations(user.tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('escalate')
+  @ApiOperation({ summary: 'Escalate to human agent', description: 'Request escalation to a human agent for a conversation' })
+  @ApiResponse({ status: 201, description: 'Escalation created' })
+  async escalate(@Body() dto: EscalateDto, @CurrentUser() user: any) {
+    return this.escalationService.escalate(
+      dto.conversationId,
+      user.tenantId,
+      dto.customerId || user.sub,
+      dto.reason,
+      dto.priority,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('escalations')
+  @ApiOperation({ summary: 'List escalations', description: 'Returns escalations for the tenant (agents/admins)' })
+  @ApiQuery({ name: 'status', required: false, enum: ['OPEN', 'ASSIGNED', 'RESOLVED', 'CLOSED'] as const })
+  @ApiQuery({ name: 'page', required: false, type: String })
+  @ApiQuery({ name: 'limit', required: false, type: String })
+  @ApiResponse({ status: 200, description: 'List of escalations' })
+  async listEscalations(
+    @Query() filters: EscalationFilterDto,
+    @CurrentUser() user: any,
+  ) {
+    const page = filters.page ? parseInt(filters.page, 10) : 1;
+    const limit = filters.limit ? parseInt(filters.limit, 10) : 20;
+    return this.escalationService.getOpenEscalations(user.tenantId, filters.status, page, limit);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('escalations/my')
+  @ApiOperation({ summary: 'My escalations', description: 'Returns escalations assigned to the current agent' })
+  @ApiResponse({ status: 200, description: 'My escalations' })
+  async myEscalations(@CurrentUser() user: any) {
+    return this.escalationService.getMyEscalations(user.sub, user.tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('escalations/:id')
+  @ApiOperation({ summary: 'Get escalation detail', description: 'Returns escalation with conversation history' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiResponse({ status: 200, description: 'Escalation detail' })
+  async getEscalation(@Param('id') id: string) {
+    return this.escalationService.getEscalationWithConversation(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch('escalations/:id/assign')
+  @ApiOperation({ summary: 'Assign escalation', description: 'Assign escalation to an agent' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiResponse({ status: 200, description: 'Escalation assigned' })
+  async assignEscalation(
+    @Param('id') id: string,
+    @Body() dto: AssignEscalationDto,
+  ) {
+    return this.escalationService.assign(id, dto.agentUserId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch('escalations/:id/resolve')
+  @ApiOperation({ summary: 'Resolve escalation', description: 'Mark escalation as resolved' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiResponse({ status: 200, description: 'Escalation resolved' })
+  async resolveEscalation(
+    @Param('id') id: string,
+    @Body() dto: ResolveEscalationDto,
+  ) {
+    return this.escalationService.resolve(id, dto.resolution);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('escalations/stats/open-count')
+  @ApiOperation({ summary: 'Get open escalation count', description: 'Returns count of open escalations' })
+  @ApiResponse({ status: 200, description: 'Open count' })
+  async getOpenCount(@CurrentUser() user: any) {
+    const count = await this.escalationService.getOpenCount(user.tenantId);
+    return { count };
   }
 
   private getTenantId(req: any): string {

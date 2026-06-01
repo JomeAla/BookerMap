@@ -10,6 +10,7 @@ import {
   Res,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { JwtService } from '@nestjs/jwt';
@@ -34,6 +35,7 @@ export class AuthController {
   ) {}
 
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new user', description: 'Creates a new user account and tenant' })
   @ApiResponse({ status: 201, description: 'User registered successfully' })
@@ -43,6 +45,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login', description: 'Authenticate with email and password' })
   @ApiResponse({ status: 200, description: 'Login successful, returns tokens' })
@@ -71,6 +74,7 @@ export class AuthController {
   }
 
   @Post('forgot-password')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Forgot password', description: 'Send password reset email' })
   @ApiResponse({ status: 200, description: 'Reset email sent if account exists' })
@@ -79,6 +83,7 @@ export class AuthController {
   }
 
   @Post('reset-password')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reset password', description: 'Reset password using reset token' })
   @ApiResponse({ status: 200, description: 'Password reset successfully' })
@@ -158,6 +163,7 @@ export class AuthController {
   }
 
   @Post('2fa/validate')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Validate 2FA code', description: 'Validate a two-factor authentication code during login' })
   @ApiResponse({ status: 200, description: '2FA valid, returns tokens' })

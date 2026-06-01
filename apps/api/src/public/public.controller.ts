@@ -1,9 +1,11 @@
 import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { PublicService } from './public.service';
 import { PublicCreateBookingDto } from './dto/public-create-booking.dto';
 
 @ApiTags('Public')
+@Throttle({ default: { limit: 10, ttl: 60000 } })
 @Controller('public')
 export class PublicController {
   constructor(private publicService: PublicService) {}

@@ -14,7 +14,7 @@ import { useToast } from '@/components/ui/toast'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowLeft, User, Mail, Calendar, DollarSign, FileText, Send, CheckCircle, Ban, Download, RotateCcw } from 'lucide-react'
+import { ArrowLeft, User, Mail, Calendar, DollarSign, FileText, Send, CheckCircle, Ban, Download, RotateCcw, CreditCard } from 'lucide-react'
 import { Select } from '@/components/ui/select'
 import type { Invoice, Payment, SavedCard } from '@/types'
 
@@ -64,6 +64,46 @@ export default function InvoiceDetailPage() {
   const [chargeDialogOpen, setChargeDialogOpen] = React.useState(false)
   const [chargeCardId, setChargeCardId] = React.useState<string | null>(null)
   const [chargeLoading, setChargeLoading] = React.useState(false)
+
+  const [partialAmount, setPartialAmount] = React.useState('')
+  const [partialProvider, setPartialProvider] = React.useState<'PAYSTACK' | 'FLUTTERWAVE'>('PAYSTACK')
+  const [partialLoading, setPartialLoading] = React.useState(false)
+  const [partialDialogOpen, setPartialDialogOpen] = React.useState(false)
+
+  const remainingBalance = invoice ? Math.max(0, invoice.total - (invoice.paidAmount || 0)) : 0
+  const progressPercent = invoice ? Math.min(100, ((invoice.paidAmount || 0) / invoice.total) * 100) : 0
+
+  async function handlePartialPayment() {
+    if (!invoice) return
+    const amount = Number(partialAmount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      addToast('Enter a valid amount', 'error')
+      return
+    }
+    if (amount > remainingBalance) {
+      addToast(`Amount cannot exceed remaining balance of ${formatCurrency(remainingBalance)}`, 'error')
+      return
+    }
+    setPartialLoading(true)
+    try {
+      const { data } = await api.post('/payments/initialize', {
+        invoiceId: invoice.id,
+        amount,
+        provider: partialProvider,
+      })
+      if (data.data.authorizationUrl) {
+        window.open(data.data.authorizationUrl, '_blank')
+        addToast('Payment link opened in new tab', 'success')
+      }
+      setPartialDialogOpen(false)
+      setPartialAmount('')
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+    } catch (err: any) {
+      addToast(err.response?.data?.message || 'Failed to initialize payment', 'error')
+    } finally {
+      setPartialLoading(false)
+    }
+  }
 
   const { data: savedCards } = useQuery({
     queryKey: ['customer-cards', invoice?.customerId],
@@ -250,6 +290,9 @@ export default function InvoiceDetailPage() {
                 <Button className="w-full" size="sm" variant="outline" onClick={() => setPosDialogOpen(true)}>
                   Pay with POS
                 </Button>
+                  <Button className="w-full" size="sm" variant="outline" onClick={() => setPartialDialogOpen(true)}>
+                    <CreditCard className="h-4 w-4 mr-2" /> Pay Partial
+                  </Button>
                 {savedCards && savedCards.length > 0 && (
                   <Button className="w-full" size="sm" variant="outline" onClick={() => setChargeDialogOpen(true)}>
                     Charge Saved Card
@@ -272,6 +315,33 @@ export default function InvoiceDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {invoice.status !== 'DRAFT' && invoice.status !== 'REFUNDED' && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Payment Progress</span>
+              <span className="text-sm text-gray-500">
+                {formatCurrency(invoice.paidAmount || 0)} / {formatCurrency(invoice.total)}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+              <div
+                className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-green-600 dark:text-green-400 font-medium">
+                Paid: {formatCurrency(invoice.paidAmount || 0)}
+              </span>
+              <span className="text-gray-500">
+                Remaining: {formatCurrency(remainingBalance)}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -442,6 +512,56 @@ export default function InvoiceDetailPage() {
             {(!savedCards || savedCards.length === 0) && (
               <p className="text-sm text-gray-500 text-center">No saved cards available</p>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={partialDialogOpen} onOpenChange={setPartialDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Make a Partial Payment</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">Invoice Total</span>
+                <span className="font-medium">{formatCurrency(invoice?.total || 0)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">Already Paid</span>
+                <span className="font-medium text-green-600">{formatCurrency(invoice?.paidAmount || 0)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold border-t border-blue-200 dark:border-blue-700 pt-1 mt-1">
+                <span>Remaining Balance</span>
+                <span>{formatCurrency(remainingBalance)}</span>
+              </div>
+            </div>
+            <Input
+              label="Amount to Pay"
+              type="number"
+              value={partialAmount}
+              onChange={(e) => setPartialAmount(e.target.value)}
+              max={remainingBalance}
+              min={1}
+              placeholder={`Max ${formatCurrency(remainingBalance)}`}
+            />
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
+              <select
+                className="flex w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                value={partialProvider}
+                onChange={(e) => setPartialProvider(e.target.value as 'PAYSTACK' | 'FLUTTERWAVE')}
+              >
+                <option value="PAYSTACK">Paystack</option>
+                <option value="FLUTTERWAVE">Flutterwave</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setPartialDialogOpen(false)} disabled={partialLoading}>
+                Cancel
+              </Button>
+              <Button onClick={handlePartialPayment} disabled={partialLoading || !partialAmount || Number(partialAmount) <= 0}>
+                {partialLoading ? 'Processing...' : `Pay ${partialAmount ? formatCurrency(Number(partialAmount)) : ''}`}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

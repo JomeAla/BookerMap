@@ -230,6 +230,7 @@ export interface Invoice {
   id: string
   invoiceNumber: string
   status: InvoiceStatus
+  paidAmount: number
   subtotal: number
   tax: number
   taxRate: number
@@ -447,6 +448,73 @@ export interface BookingFile {
   data: string
   uploadedBy?: string | null
   createdAt: string
+}
+
+export enum SplitStatus {
+  PENDING = 'PENDING',
+  RELEASED = 'RELEASED',
+  ON_HOLD = 'ON_HOLD',
+  REFUNDED = 'REFUNDED',
+}
+
+export interface SplitPayment {
+  id: string
+  tenantId: string
+  bookingId: string
+  booking?: Booking & { customer?: Customer; service?: Service }
+  invoiceId?: string | null
+  invoice?: Invoice | null
+  providerId: string
+  provider?: { id: string; firstName: string; lastName: string; email?: string }
+  totalAmount: number
+  platformFee: number
+  providerAmount: number
+  platformRate: number
+  status: SplitStatus
+  releasedAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export enum EscalationStatus {
+  OPEN = 'OPEN',
+  ASSIGNED = 'ASSIGNED',
+  RESOLVED = 'RESOLVED',
+  CLOSED = 'CLOSED',
+}
+
+export enum EscalationPriority {
+  LOW = 'LOW',
+  NORMAL = 'NORMAL',
+  HIGH = 'HIGH',
+  URGENT = 'URGENT',
+}
+
+export interface Escalation {
+  id: string
+  tenantId: string
+  conversationId: string
+  customerId?: string | null
+  customer?: { id: string; firstName: string; lastName: string; email?: string | null } | null
+  assignedToId?: string | null
+  assignedTo?: { id: string; firstName: string; lastName: string; email?: string | null } | null
+  reason?: string | null
+  status: EscalationStatus
+  priority: EscalationPriority
+  createdAt: string
+  resolvedAt?: string | null
+  resolution?: string | null
+  messages?: AiMessage[]
+}
+
+export interface ChatPaymentAction {
+  type: 'pay_now' | 'pay_later' | 'payment_confirmed' | 'payment_failed';
+  invoiceNumber?: string;
+  amount?: number;
+  currency?: string;
+  paymentLink?: string;
+  reference?: string;
+  invoiceId?: string;
 }
 
 export interface AiResponse {

@@ -176,7 +176,11 @@ export class InvoiceService {
 
     const updated = await this.prisma.invoice.update({
       where: { id },
-      data: { status: 'PAID', paidAt: new Date() },
+      data: {
+        status: 'PAID',
+        paidAt: new Date(),
+        paidAmount: invoice.total,
+      },
       include: { lineItems: true, customer: true, booking: true, payments: true },
     });
 
@@ -184,5 +188,13 @@ export class InvoiceService {
       .catch(err => this.logger.error('Webhook dispatch failed', err));
 
     return updated;
+  }
+
+  async getInvoicePayments(tenantId: string, invoiceId: string) {
+    const invoice = await this.findById(tenantId, invoiceId);
+    return this.prisma.payment.findMany({
+      where: { invoiceId: invoice.id },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 }

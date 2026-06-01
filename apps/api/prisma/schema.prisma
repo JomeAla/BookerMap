@@ -15,6 +15,13 @@ enum UserRole {
   CUSTOMER
 }
 
+enum SplitStatus {
+  PENDING
+  RELEASED
+  ON_HOLD
+  REFUNDED
+}
+
 enum BookingStatus {
   PENDING
   CONFIRMED
@@ -70,7 +77,8 @@ enum ReviewStatus {
 
 enum JobStatus {
   ASSIGNED
-  EN_ROUTE
+  OFFERED
+  ACCEPTED
   STARTED
   COMPLETED
   CANCELLED
@@ -96,6 +104,20 @@ enum BillingCycle {
   YEARLY
 }
 
+enum EscalationStatus {
+  OPEN
+  ASSIGNED
+  RESOLVED
+  CLOSED
+}
+
+enum EscalationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
 model Tenant {
   id            String   @id @default(cuid())
   name          String
@@ -105,9 +127,10 @@ model Tenant {
   primaryColor  String   @default("#3B82F6")
   timezone      String   @default("Africa/Lagos")
   currency      String   @default("NGN")
-  trialEndsAt   DateTime?
-  aiSettings    Json?
-  isActive      Boolean  @default(true)
+  trialEndsAt     DateTime?
+  platformFeeRate Float     @default(10)
+  aiSettings      Json?
+  isActive        Boolean   @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -129,6 +152,8 @@ model Tenant {
   reviews            Review[]
   inventoryItems     InventoryItem[]
   bookingInventory   BookingInventory[]
+  splitPayments      SplitPayment[]
+  escalations        Escalation[]
   subscription       Subscription?
 
   @@map("tenants")
@@ -212,6 +237,9 @@ model User {
   googleCalendarToken GoogleCalendarToken?
   commissionRate      Float?
   commissionType      String?   @default("PERCENTAGE")
+  splitPayments       SplitPayment[]
+  escalations         Escalation[]   @relation("EscalatedCustomer")
+  assignedEscalations Escalation[]   @relation("EscalatedAgent")
 
   @@unique([tenantId, email])
   @@map("users")
@@ -238,6 +266,7 @@ model Customer {
   invoices  Invoice[]
   reviews   Review[]
   savedCards SavedCard[]
+  recurringPayments RecurringPayment[]
 
   @@unique([tenantId, phone])
   @@map("customers")
@@ -281,6 +310,7 @@ model Service {
   intakeFields IntakeField[]
   bookings     Booking[]
   territoryServices TerritoryService[]
+  recurringPayments RecurringPayment[] @relation("ServiceRecurringPayments")
 
   @@map("services")
 }
@@ -382,6 +412,7 @@ model Booking {
   recurrence     RecurringBooking? @relation(fields: [recurrenceId], references: [id])
   inventoryUsage BookingInventory[]
   files        BookingFile[]
+  splitPayments  SplitPayment[]
 
   @@map("bookings")
 }
@@ -449,19 +480,22 @@ model Review {
 }
 
 model Dispatch {
-  id        String    @id @default(cuid())
-  status    JobStatus @default(ASSIGNED)
-  startedAt DateTime?
-  completedAt DateTime?
-  notes     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
+  id            String   @id @default(cuid())
+  tenantId      String
   bookingId     String @unique
-  booking       Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  assignedToId  String
-  assignedTo    User   @relation("AssignedUser", fields: [assignedToId], references: [id])
+  booking       Booking  @relation(fields: [bookingId], references: [id])
+  assignedToId  String?  // technician who accepted the job
+  assignedTo    User?    @relation("AssignedUser", fields: [assignedToId], references: [id])
+  status        JobStatus @default(ASSIGNED) // ASSIGNED, OFFERED, ACCEPTED, STARTED, COMPLETED, CANCELLED
+  offeredAt     DateTime? // when job was first offered
+  acceptedAt    DateTime? // when technician accepted
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
+  @@index([tenantId])
+  @@index([bookingId])
   @@map("dispatches")
 }
 
@@ -469,6 +503,7 @@ model Invoice {
   id          String        @id @default(cuid())
   invoiceNumber String       @unique
   status      InvoiceStatus @default(DRAFT)
+  paidAmount  Float         @default(0)
   subtotal    Float
   tax         Float         @default(0)
   taxRate     Float         @default(0)
@@ -489,6 +524,8 @@ model Invoice {
 
   lineItems  InvoiceLineItem[]
   payments   Payment[]
+  recurringPaymentLogs RecurringPaymentLog[] @relation("InvoiceRecurringPaymentLogs")
+  splitPayments SplitPayment[]
 
   @@map("invoices")
 }
@@ -520,6 +557,7 @@ model Payment {
 
   invoiceId String
   invoice   Invoice @relation(fields: [invoiceId], references: [id])
+  recurringPaymentLogs RecurringPaymentLog[] @relation("PaymentRecurringPaymentLogs")
 
   @@map("payments")
 }
@@ -808,4 +846,110 @@ model BookingFile {
   @@index([tenantId])
   @@index([bookingId])
   @@map("booking_files")
+}
+
+model RecurringPayment {
+  id            String   @id @default(cuid())
+  tenantId      String
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  serviceId     String
+  service       Service  @relation("ServiceRecurringPayments", fields: [serviceId], references: [id], onDelete: Cascade)
+  amount        Int      // in subunit (kobo/cents)
+  currency      String   @default("NGN")
+  frequency     String   // DAILY, WEEKLY, BIWEEKLY, MONTHLY, QUARTERLY, YEARLY
+  startDate     DateTime
+  endDate       DateTime?
+  nextPaymentAt DateTime
+  isActive      Boolean  @default(true)
+  paymentMethod String   // PAYSTACK, FLUTTERWAVE
+  reference     String?  // external reference from payment provider
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  recurringPaymentLogs RecurringPaymentLog[] @relation("RecurringPaymentLogs")
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([serviceId])
+  @@map("recurring_payments")
+}
+
+model SplitPayment {
+  id             String       @id @default(cuid())
+  tenantId       String
+  tenant         Tenant       @relation(fields: [tenantId], references: [id])
+  bookingId      String
+  booking        Booking      @relation(fields: [bookingId], references: [id])
+  invoiceId      String?
+  invoice        Invoice?     @relation(fields: [invoiceId], references: [id])
+  providerId     String
+  provider       User         @relation(fields: [providerId], references: [id])
+  totalAmount    Float
+  platformFee    Float
+  providerAmount Float
+  platformRate   Float
+  status         SplitStatus  @default(PENDING)
+  releasedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([tenantId])
+  @@index([bookingId])
+  @@index([providerId])
+  @@map("split_payments")
+}
+
+model RecurringPaymentLog {
+  id          String   @id @default(cuid())
+  recurringPaymentId String
+  recurringPayment RecurringPayment @relation("RecurringPaymentLogs", fields: [recurringPaymentId], references: [id])
+  tenantId    String
+   invoiceId   String?
+   invoice     Invoice?  @relation("InvoiceRecurringPaymentLogs", fields: [invoiceId], references: [id])
+   paymentId   String?
+   payment     Payment?  @relation("PaymentRecurringPaymentLogs", fields: [paymentId], references: [id])
+  amount      Int
+  status      String   // PENDING, SUCCESS, FAILED, CANCELED
+  processedAt DateTime
+  failureReason String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([recurringPaymentId])
+  @@map("recurring_payment_logs")
+}
+
+model Escalation {
+  id             String             @id @default(cuid())
+  tenantId       String
+  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversationId String             @unique
+  customerId     String?
+  customer       User?              @relation("EscalatedCustomer", fields: [customerId], references: [id])
+  assignedToId   String?
+  assignedTo     User?              @relation("EscalatedAgent", fields: [assignedToId], references: [id])
+  reason         String?
+  status         EscalationStatus   @default(OPEN)
+  priority       EscalationPriority @default(NORMAL)
+  createdAt      DateTime           @default(now())
+  resolvedAt     DateTime?
+  resolution     String?
+
+  @@index([tenantId])
+  @@index([assignedToId])
+  @@map("escalations")
+}
+
+model IdempotencyKey {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  response    Json
+  statusCode  Int      @default(200)
+  requestHash String?
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  @@map("idempotency_keys")
 }

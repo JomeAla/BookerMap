@@ -5,6 +5,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam }
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Idempotent } from '../common/decorators/idempotency.decorator';
 import { PaymentService } from './payment.service';
 import { CardService } from './card.service';
 import { PaystackService } from './providers/paystack.service';
@@ -31,6 +32,7 @@ export class PaymentController {
   ) {}
 
   @Post('initialize')
+  @Idempotent()
   @ApiOperation({ summary: 'Initialize payment', description: 'Initialize a payment with the selected provider (Paystack/Flutterwave)' })
   @ApiResponse({ status: 200, description: 'Payment initialized, returns authorization URL' })
   @ApiResponse({ status: 404, description: 'Invoice not found' })
@@ -46,15 +48,23 @@ export class PaymentController {
     });
     if (!invoice) throw new HttpException('Invoice not found', 404);
     if (invoice.status === 'PAID') throw new HttpException('Invoice is already paid', 400);
+    if (invoice.status === 'CANCELLED') throw new HttpException('Invoice is cancelled', 400);
+
+    const paymentAmount = dto.amount || invoice.total;
+    const remainingBalance = invoice.total - invoice.paidAmount;
+    if (paymentAmount > remainingBalance) {
+      throw new HttpException(`Amount exceeds remaining balance of ${remainingBalance}`, 400);
+    }
 
     const reference = `BMR-${tenantId.slice(0, 6)}-${invoice.invoiceNumber}-${Date.now()}`.toUpperCase();
 
     const result = await this.paymentService.initializePayment(
       invoice.customer.email || user.email,
-      invoice.total,
+      paymentAmount,
       {
         invoiceNumber: invoice.invoiceNumber,
         customerName: `${invoice.customer.firstName} ${invoice.customer.lastName}`,
+        partialPayment: paymentAmount < invoice.total,
       },
       tenantId,
       dto.provider,
@@ -62,7 +72,7 @@ export class PaymentController {
 
     await this.prisma.payment.create({
       data: {
-        amount: invoice.total,
+        amount: paymentAmount,
         currency: 'NGN',
         status: 'PENDING',
         provider: dto.provider || 'PAYSTACK',
@@ -82,6 +92,7 @@ export class PaymentController {
   }
 
   @Post('verify/:reference')
+  @Idempotent()
   @ApiOperation({ summary: 'Verify payment', description: 'Verify a payment by provider reference' })
   @ApiParam({ name: 'reference', type: String, description: 'Payment provider reference' })
   @ApiResponse({ status: 200, description: 'Payment verification result' })
@@ -98,16 +109,12 @@ export class PaymentController {
     const result = await this.paymentService.verifyPayment(reference, tenantId);
 
     if (result.status === 'success') {
-      const [updatedPayment] = await Promise.all([
-        this.prisma.payment.update({
-          where: { id: payment.id },
-          data: { status: 'SUCCESS', currency: result.currency, providerData: result.customer },
-        }),
-        this.prisma.invoice.update({
-          where: { id: payment.invoiceId },
-          data: { status: 'PAID', paidAt: new Date() },
-        }),
-      ]);
+      const updatedPayment = await this.paymentService.handlePaymentSuccess(
+        payment.id,
+        payment.invoiceId,
+        tenantId,
+        result.customer,
+      );
       return { success: true, data: updatedPayment };
     }
 
@@ -154,6 +161,7 @@ export class PaymentController {
   }
 
   @Post('refund')
+  @Idempotent()
   @ApiOperation({ summary: 'Refund payment', description: 'Process a refund for a payment' })
   @ApiResponse({ status: 200, description: 'Refund processed' })
   @ApiResponse({ status: 404, description: 'Payment not found' })
@@ -163,6 +171,7 @@ export class PaymentController {
   }
 
   @Post('pos/initialize')
+  @Idempotent()
   @ApiOperation({ summary: 'Initialize POS payment', description: 'Initialize a point-of-sale payment' })
   @ApiResponse({ status: 200, description: 'POS payment initialized' })
   async initPosPayment(@Body() dto: InitPosPaymentDto, @TenantId() tenantId: string) {
@@ -183,6 +192,7 @@ export class PaymentController {
   }
 
   @Post('pos/verify/:reference')
+  @Idempotent()
   @ApiOperation({ summary: 'Verify POS payment', description: 'Verify a point-of-sale payment by reference' })
   @ApiParam({ name: 'reference', type: String, description: 'Payment reference' })
   @ApiResponse({ status: 200, description: 'POS payment verification result' })
@@ -194,14 +204,11 @@ export class PaymentController {
     });
 
     if (payment && result.status === 'success') {
-      await this.prisma.payment.update({
-        where: { id: payment.id },
-        data: { status: 'SUCCESS' },
-      });
-      await this.prisma.invoice.update({
-        where: { id: payment.invoiceId },
-        data: { status: 'PAID', paidAt: new Date() },
-      });
+      await this.paymentService.handlePaymentSuccess(
+        payment.id,
+        payment.invoiceId,
+        tenantId,
+      );
     }
 
     return { success: true, data: result };
@@ -250,6 +257,7 @@ export class PaymentController {
   }
 
   @Post('cards/:id/charge')
+  @Idempotent()
   @ApiOperation({ summary: 'Charge a saved card', description: 'Charge an amount to a saved card' })
   @ApiParam({ name: 'id', type: String, description: 'Card ID' })
   @ApiResponse({ status: 200, description: 'Card charged' })

@@ -4,6 +4,8 @@ import * as React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/lib/api'
 import {
   LayoutDashboard,
   CalendarCheck,
@@ -25,6 +27,8 @@ import {
   Megaphone,
   Sun,
   Moon,
+  Percent,
+  AlertCircle,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
@@ -36,11 +40,13 @@ const navItems = [
   { href: '/services', label: 'Services', icon: Wrench },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/invoices', label: 'Invoices', icon: FileText },
+  { href: '/split-payments', label: 'Split Payments', icon: Percent },
   { href: '/dispatches', label: 'Dispatches', icon: Truck },
   { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/inventory', label: 'Inventory', icon: Package },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/ai/history', label: 'AI History', icon: Bot },
+  { href: '/ai/escalations', label: 'Escalations', icon: AlertCircle },
   { href: '/marketing', label: 'Marketing', icon: Megaphone },
   { href: '/settings/subscription', label: 'Subscription', icon: CreditCard },
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -51,6 +57,20 @@ export function Sidebar() {
   const { user, logout } = useAuth()
   const [collapsed, setCollapsed] = React.useState(false)
   const [dark, setDark] = React.useState(false)
+
+  const { data: escalationCount } = useQuery({
+    queryKey: ['escalation-count'],
+    queryFn: async () => {
+      try {
+        const { data } = await api.get('/ai/escalations/stats/open-count')
+        return data.data?.count ?? 0
+      } catch {
+        return 0
+      }
+    },
+    refetchInterval: 15000,
+    enabled: !!user && ['ADMIN', 'MANAGER', 'OWNER'].includes(user.role),
+  })
 
   React.useEffect(() => {
     const isDark = document.documentElement.classList.contains('dark')
@@ -97,8 +117,24 @@ export function Sidebar() {
                 )}
                 title={collapsed ? item.label : undefined}
               >
-                <Icon className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
+                <div className="relative">
+                  <Icon className="h-5 w-5 shrink-0" />
+                  {item.href === '/ai/escalations' && escalationCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] flex items-center justify-center px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                      {escalationCount > 99 ? '99+' : escalationCount}
+                    </span>
+                  )}
+                </div>
+                {!collapsed && (
+                  <span className="flex items-center gap-2">
+                    <span>{item.label}</span>
+                    {item.href === '/ai/escalations' && escalationCount > 0 && (
+                      <span className="h-5 min-w-[20px] flex items-center justify-center px-1.5 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                        {escalationCount > 99 ? '99+' : escalationCount}
+                      </span>
+                    )}
+                  </span>
+                )}
               </Link>
             )
           })}

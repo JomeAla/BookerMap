@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
+import { BookingModule } from '../booking/booking.module';
+import { AiAgentModule } from '../ai-agent/ai-agent.module';
 import { WebhookController } from './webhook.controller';
 import { WebhookService } from './webhook.service';
+import { WebhookActionService } from './webhook-action.service';
 
 @Module({
-  imports: [],
+  imports: [BookingModule, AiAgentModule],
   controllers: [WebhookController],
-  providers: [WebhookService],
-  exports: [WebhookService],
+  providers: [WebhookService, WebhookActionService],
+  exports: [WebhookService, WebhookActionService],
 })
 export class WebhookModule {}

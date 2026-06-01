@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch,
+  Controller, Get, Post, Patch, Logger,
   Body, Param, Query, UseGuards, HttpException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { BookingService } from './booking.service';
 import { SchedulingService } from './scheduling.service';
+import { SplitPaymentService } from '../split-payment/split-payment.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { RescheduleBookingDto } from './dto/reschedule-booking.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,9 +17,12 @@ import { PrismaService } from '../prisma/prisma.service';
 @Controller('bookings')
 @UseGuards(JwtAuthGuard)
 export class BookingController {
+  private readonly logger = new Logger(BookingController.name);
+
   constructor(
     private readonly bookingService: BookingService,
     private readonly schedulingService: SchedulingService,
+    private readonly splitPaymentService: SplitPaymentService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -45,6 +49,21 @@ export class BookingController {
     @Query('technicianId') technicianId?: string,
   ) {
     return this.bookingService.findAll(tenantId, { status, dateFrom, dateTo, technicianId });
+  }
+
+  @Get('check-slot')
+  @ApiOperation({ summary: 'Check slot availability', description: 'Check if a time slot is available for rescheduling' })
+  @ApiQuery({ name: 'bookingId', required: true, type: String, description: 'Booking ID' })
+  @ApiQuery({ name: 'startTime', required: true, type: String, description: 'New start time (ISO)' })
+  @ApiQuery({ name: 'endTime', required: true, type: String, description: 'New end time (ISO)' })
+  @ApiResponse({ status: 200, description: 'Slot availability result' })
+  async checkSlot(
+    @TenantId() tenantId: string,
+    @Query('bookingId') bookingId: string,
+    @Query('startTime') startTime: string,
+    @Query('endTime') endTime: string,
+  ) {
+    return this.schedulingService.checkSlotAvailability(bookingId, tenantId, new Date(startTime), new Date(endTime));
   }
 
   @Get('available-slots')
@@ -87,8 +106,15 @@ export class BookingController {
     const updated = await this.prisma.booking.update({
       where: { id },
       data: { status: body.status as any },
-      include: { customer: true, service: true, technician: true, dispatch: true },
+      include: { customer: true, service: true, technician: true, dispatch: true, invoices: { where: { status: 'PAID' } } },
     });
+
+    if (body.status === 'COMPLETED' && updated.invoices?.length > 0) {
+      for (const inv of updated.invoices) {
+        this.splitPaymentService.createSplitPayment(updated.id, inv.id)
+          .catch(err => this.logger.error('Failed to create split payment', err));
+      }
+    }
 
     return { success: true, data: updated };
   }
@@ -118,7 +144,7 @@ export class BookingController {
     if (!technicianId) throw new HttpException('No technician assigned to this booking', 400);
 
     const dispatch = await this.prisma.dispatch.create({
-      data: { bookingId: id, assignedToId: technicianId, status: 'ASSIGNED' },
+      data: { tenantId, bookingId: id, assignedToId: technicianId, status: 'ASSIGNED' },
       include: {
         booking: { include: { customer: true, service: true } },
         assignedTo: true,

@@ -2,12 +2,14 @@
 
 import * as React from 'react'
 import { api } from '@/lib/api'
-import { MessageSquare, X, Send, Loader2 } from 'lucide-react'
+import { MessageSquare, X, Send, Loader2, ExternalLink, CheckCircle, XCircle } from 'lucide-react'
+import type { ChatPaymentAction } from '@/types'
 
 interface Message {
   role: 'user' | 'assistant'
   content: string
   quickReplies?: string[]
+  paymentAction?: ChatPaymentAction
 }
 
 interface ChatResponse {
@@ -16,6 +18,7 @@ interface ChatResponse {
   entities: Record<string, string>
   conversationId: string
   quickReplies?: string[]
+  paymentAction?: ChatPaymentAction
 }
 
 const STORAGE_KEY = 'bm_chat_cid'
@@ -39,6 +42,72 @@ function clearConversationId(tenantSlug: string) {
   try {
     localStorage.removeItem(`${STORAGE_KEY}_${tenantSlug}`)
   } catch {}
+}
+
+function PaymentCard({ action }: { action: ChatPaymentAction }) {
+  if (action.type === 'payment_confirmed') {
+    return (
+      <div className="mt-2 rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20 p-3">
+        <div className="flex items-center gap-2 text-green-700 dark:text-green-300 font-medium text-sm">
+          <CheckCircle className="h-4 w-4" />
+          Payment Confirmed
+        </div>
+        {action.amount && (
+          <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+            {action.currency || 'NGN'} {action.amount.toLocaleString()}
+          </p>
+        )}
+        {action.invoiceNumber && (
+          <p className="text-xs text-green-500 dark:text-green-400 mt-0.5">
+            Invoice: {action.invoiceNumber}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  if (action.type === 'payment_failed') {
+    return (
+      <div className="mt-2 rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20 p-3">
+        <div className="flex items-center gap-2 text-red-700 dark:text-red-300 font-medium text-sm">
+          <XCircle className="h-4 w-4" />
+          Payment Failed
+        </div>
+        {action.invoiceNumber && (
+          <p className="text-xs text-red-500 mt-1">Invoice: {action.invoiceNumber}</p>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20 p-3">
+      <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">
+        Payment Required
+      </p>
+      {action.invoiceNumber && (
+        <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+          Invoice: {action.invoiceNumber}
+        </p>
+      )}
+      {action.amount && (
+        <p className="text-base font-bold text-blue-800 dark:text-blue-200 mt-1">
+          {action.currency || 'NGN'} {action.amount.toLocaleString()}
+        </p>
+      )}
+      {action.paymentLink && (
+        <a
+          href={action.paymentLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Pay Now
+        </a>
+      )}
+    </div>
+  )
 }
 
 export function ChatWidget({ tenantSlug }: { tenantSlug?: string }) {
@@ -97,6 +166,7 @@ export function ChatWidget({ tenantSlug }: { tenantSlug?: string }) {
         role: 'assistant',
         content: result.reply,
         quickReplies: result.quickReplies,
+        paymentAction: result.paymentAction,
       }
       setMessages((prev) => [...prev, assistantMessage])
     } catch {
@@ -157,6 +227,7 @@ export function ChatWidget({ tenantSlug }: { tenantSlug?: string }) {
                     }`}
                   >
                     {msg.content}
+                    {msg.paymentAction && <PaymentCard action={msg.paymentAction} />}
                   </div>
                 </div>
                 {msg.role === 'assistant' && msg.quickReplies && msg.quickReplies.length > 0 && (

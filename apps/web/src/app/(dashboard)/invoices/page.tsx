@@ -22,6 +22,7 @@ const statusTabs = [
   { value: '', label: 'All' },
   { value: 'DRAFT', label: 'Draft' },
   { value: 'SENT', label: 'Sent' },
+  { value: 'PARTIALLY_PAID', label: 'Partially Paid' },
   { value: 'PAID', label: 'Paid' },
   { value: 'OVERDUE', label: 'Overdue' },
   { value: 'CANCELLED', label: 'Cancelled' },
@@ -269,20 +270,41 @@ export default function InvoicesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {invoices.map((inv) => (
-                    <TableRow key={inv.id}>
-                      <TableCell className="font-mono text-sm font-medium">{inv.invoiceNumber}</TableCell>
-                      <TableCell>{inv.customer?.firstName} {inv.customer?.lastName}</TableCell>
-                      <TableCell>{formatCurrency(inv.total)}</TableCell>
-                      <TableCell className="text-sm">{formatDate(inv.dueDate, 'MMM d, yyyy')}</TableCell>
-                      <TableCell><StatusBadge status={inv.status} /></TableCell>
-                      <TableCell>
-                        <Link href={`/invoices/${inv.id}`}>
-                          <Button variant="ghost" size="sm">View</Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {invoices.map((inv) => {
+                    const invPaid = inv.paidAmount || 0
+                    const invProgress = inv.total > 0 ? Math.min(100, (invPaid / inv.total) * 100) : 0
+                    return (
+                      <TableRow key={inv.id}>
+                        <TableCell className="font-mono text-sm font-medium">{inv.invoiceNumber}</TableCell>
+                        <TableCell>{inv.customer?.firstName} {inv.customer?.lastName}</TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="text-sm font-medium">{formatCurrency(inv.total)}</div>
+                            {(invPaid > 0 && inv.status !== 'PAID' && inv.status !== 'REFUNDED') && (
+                              <div className="text-xs text-green-600 dark:text-green-400">
+                                {formatCurrency(invPaid)} paid
+                              </div>
+                            )}
+                            {(invPaid > 0 && inv.status !== 'PAID' && inv.status !== 'REFUNDED') && (
+                              <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                                <div
+                                  className="bg-blue-600 dark:bg-blue-500 h-1.5 rounded-full"
+                                  style={{ width: `${invProgress}%` }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">{formatDate(inv.dueDate, 'MMM d, yyyy')}</TableCell>
+                        <TableCell><StatusBadge status={inv.status} /></TableCell>
+                        <TableCell>
+                          <Link href={`/invoices/${inv.id}`}>
+                            <Button variant="ghost" size="sm">View</Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>

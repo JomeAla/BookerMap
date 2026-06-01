@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/toast'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { timeAgo } from '@/lib/utils'
-import { Webhook as WebhookIcon, Plus, Copy, Edit2, Trash2, Play, Loader2 } from 'lucide-react'
+import { Webhook as WebhookIcon, Plus, Copy, Edit2, Trash2, Play, Loader2, Terminal } from 'lucide-react'
 import type { Webhook } from '@/types'
 
 const WEBHOOK_EVENTS = [
@@ -29,6 +29,14 @@ const WEBHOOK_EVENTS = [
   'payment.failed',
   'review.created',
   'review.updated',
+]
+
+const WEBHOOK_ACTIONS = [
+  { value: 'trigger_ai', label: 'Trigger AI Agent', description: 'Send a message to the AI agent and get a response' },
+  { value: 'check_availability', label: 'Check Availability', description: 'Check available time slots for a service and date' },
+  { value: 'create_booking', label: 'Create Booking', description: 'Create a new booking' },
+  { value: 'get_booking_status', label: 'Get Booking Status', description: 'Check a booking status by ID or reference' },
+  { value: 'get_customer_info', label: 'Get Customer Info', description: 'Look up customer by phone or email' },
 ]
 
 export default function WebhooksPage() {
@@ -400,6 +408,217 @@ export default function WebhooksPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ExternalWebhookSection />
     </div>
+  )
+}
+
+function ExternalWebhookSection() {
+  const { addToast } = useToast()
+  const [activeTab, setActiveTab] = React.useState<'docs' | 'test'>('docs')
+  const [selectedAction, setSelectedAction] = React.useState(WEBHOOK_ACTIONS[0].value)
+  const [payloadText, setPayloadText] = React.useState('{\n  "message": "Book a service for tomorrow at 10am"\n}')
+  const [responseText, setResponseText] = React.useState<string | null>(null)
+  const [testLoading, setTestLoading] = React.useState(false)
+  const [webhookSecret, setWebhookSecret] = React.useState('')
+  const [tenantSlug, setTenantSlug] = React.useState('')
+
+  const webhookUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/webhooks/external`
+
+  const getActionPayload = (action: string) => {
+    switch (action) {
+      case 'trigger_ai':
+        return '{\n  "message": "Book a service for tomorrow at 10am"\n}'
+      case 'check_availability':
+        return '{\n  "serviceId": "SERVICE_ID",\n  "date": "2026-06-15"\n}'
+      case 'create_booking':
+        return '{\n  "serviceId": "SERVICE_ID",\n  "startTime": "2026-06-15T10:00:00.000Z",\n  "customerPhone": "+2348012345678",\n  "customerFirstName": "John",\n  "customerLastName": "Doe"\n}'
+      case 'get_booking_status':
+        return '{\n  "bookingId": "BOOKING_ID"\n}'
+      case 'get_customer_info':
+        return '{\n  "phone": "+2348012345678"\n}'
+      default:
+        return '{}'
+    }
+  }
+
+  const handleActionChange = (action: string) => {
+    setSelectedAction(action)
+    setPayloadText(getActionPayload(action))
+    setResponseText(null)
+  }
+
+  const handleSendTest = async () => {
+    if (!webhookSecret || !tenantSlug) {
+      addToast('Please fill in webhook secret and tenant slug', 'error')
+      return
+    }
+
+    let payload: Record<string, unknown>
+    try {
+      payload = JSON.parse(payloadText)
+    } catch {
+      addToast('Invalid JSON payload', 'error')
+      return
+    }
+
+    setTestLoading(true)
+    setResponseText(null)
+
+    try {
+      const res = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-webhook-secret': webhookSecret,
+          'x-tenant-slug': tenantSlug,
+        },
+        body: JSON.stringify({ action: selectedAction, payload }),
+      })
+      const data = await res.json()
+      setResponseText(JSON.stringify(data, null, 2))
+    } catch (err: any) {
+      setResponseText(JSON.stringify({ success: false, message: err.message }, null, 2))
+    } finally {
+      setTestLoading(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="pt-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <Terminal className="h-5 w-5 text-gray-500" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">External Webhook Triggers</h2>
+        </div>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Allow external services to trigger AI actions via webhook. Use the endpoint below to send actions programmatically.
+        </p>
+
+        <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+          <button
+            onClick={() => setActiveTab('docs')}
+            className={`px-3 py-1.5 text-sm font-medium rounded-t transition ${
+              activeTab === 'docs'
+                ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400'
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            Documentation
+          </button>
+          <button
+            onClick={() => setActiveTab('test')}
+            className={`px-3 py-1.5 text-sm font-medium rounded-t transition ${
+              activeTab === 'test'
+                ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400'
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            Test Tool
+          </button>
+        </div>
+
+        {activeTab === 'docs' && (
+          <div className="space-y-3 text-sm">
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white">Endpoint</h3>
+              <code className="block mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs break-all">
+                POST {webhookUrl}
+              </code>
+            </div>
+
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white">Required Headers</h3>
+              <div className="mt-1 space-y-1">
+                <code className="block p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs">
+                  x-webhook-secret: your-webhook-secret
+                </code>
+                <code className="block p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs">
+                  x-tenant-slug: your-tenant-slug
+                </code>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white">Request Body</h3>
+              <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-x-auto">{`{
+  "action": "trigger_ai | check_availability | create_booking | get_booking_status | get_customer_info",
+  "payload": { ... }
+}`}</pre>
+            </div>
+
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white">Available Actions</h3>
+              <div className="mt-1 space-y-2">
+                {WEBHOOK_ACTIONS.map((act) => (
+                  <div key={act.value} className="p-2 bg-gray-50 dark:bg-gray-800/50 rounded">
+                    <span className="font-mono text-xs font-medium text-blue-600 dark:text-blue-400">{act.value}</span>
+                    <p className="text-xs text-gray-500 mt-0.5">{act.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'test' && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Tenant Slug"
+                placeholder="your-tenant-slug"
+                value={tenantSlug}
+                onChange={e => setTenantSlug(e.target.value)}
+              />
+              <Input
+                label="Webhook Secret"
+                placeholder="your-webhook-secret"
+                type="password"
+                value={webhookSecret}
+                onChange={e => setWebhookSecret(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Action</label>
+              <select
+                value={selectedAction}
+                onChange={e => handleActionChange(e.target.value)}
+                className="mt-1 w-full h-9 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm"
+              >
+                {WEBHOOK_ACTIONS.map(act => (
+                  <option key={act.value} value={act.value}>{act.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Payload (JSON)</label>
+              <textarea
+                value={payloadText}
+                onChange={e => setPayloadText(e.target.value)}
+                rows={6}
+                className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-mono"
+              />
+            </div>
+
+            <Button onClick={handleSendTest} disabled={testLoading}>
+              {testLoading && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Send Test Request
+            </Button>
+
+            {responseText && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Response</label>
+                <pre className="mt-1 p-3 bg-gray-900 text-green-400 rounded-lg text-xs overflow-x-auto max-h-64 overflow-y-auto">
+                  {responseText}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

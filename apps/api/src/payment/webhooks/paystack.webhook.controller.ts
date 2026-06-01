@@ -1,10 +1,13 @@
 import { Controller, Post, Headers, Body, Logger, HttpException, HttpCode } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WebhookService } from '../../webhook/webhook.service';
+import { PaymentService } from '../payment.service';
 
 @ApiTags('Paystack Webhook')
+@SkipThrottle()
 @Controller('payments/webhooks/paystack')
 export class PaystackWebhookController {
   private readonly logger = new Logger(PaystackWebhookController.name);
@@ -12,6 +15,7 @@ export class PaystackWebhookController {
   constructor(
     private prisma: PrismaService,
     private webhookService: WebhookService,
+    private paymentService: PaymentService,
   ) {}
 
   @Post()
@@ -88,20 +92,12 @@ export class PaystackWebhookController {
     }
     if (payment.status === 'SUCCESS') return;
 
-    await this.prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: 'SUCCESS',
-        currency: data.currency || 'NGN',
-        fee: data.fees ? data.fees / 100 : null,
-        providerData: data,
-      },
-    });
-
-    await this.prisma.invoice.update({
-      where: { id: payment.invoiceId },
-      data: { status: 'PAID', paidAt: new Date() },
-    });
+    await this.paymentService.handlePaymentSuccess(
+      payment.id,
+      payment.invoiceId,
+      tenantId,
+      data,
+    );
 
     this.webhookService.dispatchEvent(tenantId, 'payment.completed', { paymentId: payment.id, invoiceId: payment.invoiceId, reference });
     this.logger.log(`Payment ${reference} completed successfully`);

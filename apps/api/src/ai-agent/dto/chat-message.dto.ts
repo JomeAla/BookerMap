@@ -17,6 +17,16 @@ export class ChatMessageDto {
   tenantSlug?: string;
 }
 
+export interface PaymentAction {
+  type: 'pay_now' | 'pay_later' | 'payment_confirmed' | 'payment_failed';
+  invoiceNumber?: string;
+  amount?: number;
+  currency?: string;
+  paymentLink?: string;
+  reference?: string;
+  invoiceId?: string;
+}
+
 export class ChatResponse {
   reply!: string;
   intent!: string;
@@ -24,6 +34,7 @@ export class ChatResponse {
   conversationId!: string;
   action?: string;
   quickReplies?: string[];
+  paymentAction?: PaymentAction;
 }
 
 export interface EntityMap {
@@ -34,6 +45,9 @@ export interface EntityMap {
   phone?: string;
   email?: string;
   bookingId?: string;
+  amount?: string;
+  invoiceNumber?: string;
+  reference?: string;
 }
 
 export interface ConversationState {
