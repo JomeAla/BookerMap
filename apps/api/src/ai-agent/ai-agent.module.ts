@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BookingModule } from '../booking/booking.module';
 import { CustomerModule } from '../customer/customer.module';
 import { InvoiceModule } from '../invoice/invoice.module';
@@ -16,7 +16,7 @@ import { PaymentHandler } from './handlers/payment.handler';
 import { FlowService } from './services/flow.service';
 
 @Module({
-  imports: [BookingModule, CustomerModule, InvoiceModule, NotificationModule, PaymentModule],
+  imports: [forwardRef(() => BookingModule), CustomerModule, InvoiceModule, NotificationModule, PaymentModule],
   controllers: [AiAgentController, FlowController],
   providers: [
     ConversationEngine,

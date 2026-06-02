@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { WebhookModule } from '../webhook/webhook.module';
 import { PaystackService } from './providers/paystack.service';
@@ -11,7 +11,7 @@ import { PaystackWebhookController } from './webhooks/paystack.webhook.controlle
 import { FlutterwaveWebhookController } from './webhooks/flutterwave.webhook.controller';
 
 @Module({
-  imports: [ConfigModule, WebhookModule],
+  imports: [ConfigModule, forwardRef(() => WebhookModule)],
   controllers: [
     PaymentController,
     PaymentSettingsController,
