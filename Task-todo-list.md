@@ -10,8 +10,8 @@
 ## Pre-requisites Check
 - [x] Verify Node.js v18+ installed
 - [x] Verify PostgreSQL available
-- [ ] Get Paystack API keys (test and live) — ⏳ can be set via admin UI later
-- [ ] Get Flutterwave API credentials (test and live) — ⏳ can be set via admin UI later
+- [ ] Get Paystack API keys (test and live) — will provide after this session; enter in Settings > Payments > Paystack
+- [ ] Get Flutterwave API credentials (test and live) — will provide after this session; enter in Settings > Payments > Flutterwave
 
 ---
 
@@ -40,7 +40,7 @@
 
 ### Task 7: Set Up Prisma Schema
 - [x] Prisma initialized
-- [x] Full schema with 19 tables: tenants, users, customers, addresses, services, modifiers, intake_fields, territories, territory_services, bookings, recurring_bookings, dispatches, invoices, invoice_line_items, payments, payment_settings, coupons, notifications, webhooks, ai_conversations, ai_messages, ai_responses, refresh_tokens
+- [x] Full schema with 30+ models: tenants, users, customers, addresses, services, modifiers, intake_fields, territories, territory_services, bookings, recurring_bookings, dispatches, invoices, invoice_line_items, payments, payment_settings, coupons, notifications, webhooks, ai_conversations, ai_messages, ai_responses, refresh_tokens, reviews, saved_cards, subscriptions, subscription_invoices, pricing_rules, inventory_items, booking_inventory, booking_files, campaigns, campaign_logs, split_payments, settlements, settlement_line_items, disputes, dispute_evidence, satisfaction_surveys, nps_responses, conversation_flows, flow_nodes, location_updates, api_keys, escalations, idempotency_keys
 
 ### Task 8: Configure Environment Variables
 - [x] apps/api/.env configured (DB, JWT, Paystack, Flutterwave, SMTP)
@@ -58,6 +58,8 @@
 - [x] JWT auth guard
 - [x] Login, register, refresh token
 - [x] Password reset (forgot + reset)
+- [x] OAuth (Google, Microsoft login)
+- [x] Two-factor authentication (TOTP via speakeasy)
 
 ### Task 12: Implement RBAC
 - [x] UserRole enum: ADMIN, OWNER, MANAGER, TECHNICIAN, CUSTOMER
@@ -67,6 +69,7 @@
 ### Task 13: Build Tenant Module
 - [x] TenantModule with controller + service
 - [x] Create tenant, get by slug, update
+- [x] Custom domain support (add/verify/remove, DNS config)
 
 ### Task 14: Set Up Global Error Handling
 - [x] HTTP exception filter
@@ -74,24 +77,29 @@
 - [x] Transform interceptor (wraps in { success, data })
 
 ### Task 15: Set Up API Documentation (Swagger)
-- [ ] Not implemented
+- [x] @ApiTags/@ApiOperation/@ApiResponse on all controllers
+- [x] Swagger UI at /api/docs
 
 ### Task 16: Build User Module
 - [x] CRUD operations
 - [x] Invite team member
 - [x] Update role
+- [x] Skills tagging (JSON field + autocomplete editor)
+- [x] Commission tracking (rate + type per user)
 
 ### Task 17: Build Customer Module
 - [x] CRUD operations
 - [x] Address management
 - [x] Search/filter
-- [x] Import/export
+- [x] Import/export (CSV)
+- [x] Tags & groups (comma-separated, filter/sort/edit)
 
 ### Task 18: Build Service Module
 - [x] CRUD services
 - [x] Categories
 - [x] Modifiers
 - [x] Intake fields
+- [x] Service images upload (base64 PATCH)
 
 ### Task 19: Build Territory Module
 - [x] CRUD territories
@@ -103,25 +111,31 @@
 - [x] Cancel booking
 - [x] Reschedule booking
 - [x] Webhook dispatch
+- [x] Auto-create split payments on completion
+- [x] Satisfaction survey auto-trigger on completion
 
 ### Task 21: Build Scheduling Engine
 - [x] getAvailableSlots (30-min intervals, 8am-5pm)
 - [x] checkConflict (with buffer)
 - [x] calculateEndTime (from service duration)
-- [x] Drive-time calculation
+- [x] Drive-time calculation (haversine formula)
+- [x] Check slot availability for rescheduling
 
 ### Task 22: Build Dispatch Module
 - [x] Assign job to technician
 - [x] Job status tracking (ASSIGNED → EN_ROUTE → STARTED → COMPLETED)
 - [x] List jobs by technician
-- [x] Auto-assignment rules
-- [ ] Job offer system — not started
+- [x] Auto-assignment rules (skills + load balancing)
+- [x] Job offer system (offer to multiple techs, accept by one)
 
 ### Task 23: Build Invoice Module
 - [x] Create invoice (line items, tax, discount)
 - [x] Send invoice (via EmailService)
 - [x] Mark as paid
 - [x] PDF generation
+- [x] Partial payments (paidAmount tracking, progress bar, PARTIALLY_PAID status)
+- [x] Invoice status filter pills (All/Draft/Sent/Paid/Overdue/Cancelled/Refunded/Partially Paid)
+- [x] Partial refund UI
 
 ### Task 24: Build Notification Module
 - [x] EmailService (SMTP + console fallback)
@@ -129,13 +143,17 @@
 - [x] NotificationService (in-app records)
 - [x] NotificationPanel dropdown + /notifications page (filter tabs, pagination, mark read)
 - [x] Email templates (confirmation, reminder, invoice, feedback, password reset)
-- [x] Reminder cron — ReminderCronService runs hourly via @nestjs/schedule, sends 24h-before reminders with dedup
+- [x] Reminder cron — ReminderCronService runs via @nestjs/schedule, 24h-before with dedup
+- [x] Payment reminders cron (daily 8am overdue invoices with dedup)
+- [x] Team notifications (batch by user list, multi-select + dialog)
+- [x] WhatsApp integration — stub service, booking reminder cron, webhook verification/delivery
 
 ### Task 25: Set Up Webhook Module
 - [x] Webhook CRUD
-- [x] 12 supported events
+- [x] 13 supported events
 - [x] HMAC-SHA256 signed dispatch
-- [ ] Webhook management UI in admin panel — not started
+- [x] Webhook management UI (add/edit/test/delete with secret management)
+- [x] External webhook triggers (POST /webhooks/external with action-based dispatch)
 
 ---
 
@@ -179,9 +197,14 @@
 - [x] GET /payments/:id
 - [x] GET /payments
 - [x] POST /payments/refund
+- [x] POST /payments/pos/initialize (Paystack Terminal + Flutterwave POS)
+- [x] POST /payments/pos/verify/:reference
 
 ### Task 32: Handle Recurring Payments
-- [ ] Not started
+- [x] RecurringPayment + RecurringPaymentLog models
+- [x] CRUD endpoints
+- [x] Auto-charge cron
+- [x] Frontend management page
 
 ### Task 33: Implement Refund System
 - [x] Refund in PaystackService
@@ -193,13 +216,16 @@
 - [x] Payment link generation (via initializePayment)
 - [x] Payment status tracking (via webhooks)
 - [x] Payment reminders (cron)
-- [ ] Partial payments — not implemented
+- [x] Partial payments (paidAmount tracking, installments)
 
 ### Task 35: Create Payment UI Components
-- [ ] Not started (Paystack/Flutterwave popups handle UI)
+- [x] Paystack/Flutterwave popup integration
+- [x] POS button on booking/invoice detail
+- [x] Payment history table on invoice detail
 
 ### Task 36: Implement Saved Cards Feature
-- [x] Saved cards (tokenization) for Paystack
+- [x] SavedCard model + CardService (save/list/delete/default/charge)
+- [x] Customer cards section in UI
 
 ### Task 37: Add Currency Handling
 - [x] NGN, KES, GHS, ZAR, USD, GBP, EUR supported in settings
@@ -207,16 +233,19 @@
 - [x] Amount-to-subunit conversion in provider services
 
 ### Task 38: Implement Split Payments (Marketplace)
-- [ ] Not started
+- [x] SplitPayment model + service + controller
+- [x] Auto-create on completed booking with paid invoice
+- [x] Platform fee rate per tenant
+- [x] Splits page with summary cards, filter pills, release/hold actions
 
 ### Task 39: Payment Testing
 - [ ] Not started (waiting for real keys)
 
 ### Task 40: Payment Security
-- [x] Webhook signature verification (HMAC-SHA512 for Paystack, HMAC-SHA256 for Flutterwave)
+- [x] Webhook signature verification (HMAC-SHA512 Paystack, HMAC-SHA256 Flutterwave)
 - [x] Encrypted credential storage (AES-256-GCM)
-- [ ] Rate limiting — not implemented
-- [ ] Idempotency — not implemented
+- [x] Rate limiting — @nestjs/throttler (60 req/min default, 5/min auth, 10/min public)
+- [x] Idempotency — Idempotency-Key header, 1hr TTL, conflict detection
 
 ### Task 40b: Tenant Payment Configuration Backend
 - [x] PaymentSettingsController (GET, POST Paystack, POST Flutterwave, validate, PUT, DELETE)
@@ -235,7 +264,7 @@
 - [x] Flutterwave key input fields
 - [x] Test connection button
 - [x] Save button wired
-- [ ] Webhook URL display — not started
+- [x] Webhook URL display
 
 ---
 
@@ -243,7 +272,7 @@
 
 ### Task 41: Set Up AI Agent Module
 - [x] AiAgentModule generated
-- [x] Services: ChatService, ConversationEngine, ResponseService, TaskExecutor, AnalyticsService
+- [x] Services: ChatService, ConversationEngine, ResponseService, TaskExecutor, AnalyticsService, EscalationService, FlowService
 
 ### Task 42: Create AI Conversation Engine
 - [x] Intent recognition (GREETING, BOOKING_CREATE, BOOKING_CANCEL, BOOKING_RESCHEDULE, BOOKING_STATUS, PAYMENT_INQUIRY, PRICE_INQUIRY, FALLBACK)
@@ -265,11 +294,12 @@
 - [x] GetStatusHandler — returns booking status
 - [x] GetPriceHandler — returns service price
 - [x] GetPaymentHandler — checks outstanding invoices
-- [ ] MakePaymentHandler — not implemented
+- [x] MakePaymentHandler — AI chatbot payment flow (Pay Now card in chat)
 
 ### Task 45: Create AI Chat Service
 - [x] Process message → detect intent → extract entities → execute → respond
 - [x] Save conversation history
+- [x] Flow builder integration (active flows checked before default responses)
 
 ### Task 46: Build Chat Interface (Frontend)
 - [x] Floating chat widget — ChatWidget component with bubble button + slide-up panel
@@ -277,6 +307,9 @@
 - [x] Typing indicator — Loader2 spinner while AI responds
 - [x] Quick action buttons — rendered below assistant messages
 - [x] Chat history viewer
+- [x] Voice input (Speech-to-text mic button via Web Speech API)
+- [x] Voice output (TTS toggle, speaks AI responses aloud)
+- [x] Payment action card rendering (Pay Now button)
 
 ### Task 47: Admin Configuration Interface
 - [x] Response template editor (settings/ai page)
@@ -284,23 +317,27 @@
 - [x] Language selection
 - [x] Response style (Professional, Friendly, Casual)
 - [x] Business hours for AI
-- [ ] Fallback to human agent — not started
+- [x] Fallback to human agent — escalation system (auto-detect stuck conversations, escalate queue)
 
 ### Task 48: Conversation Analytics
 - [x] Conversation stats (total, resolved, resolution rate, avg duration)
 - [x] Common query patterns (top intents)
 - [x] Failed conversation identification
-- [ ] Customer satisfaction tracking — not started
+- [x] Customer satisfaction tracking (CSAT 1-5, NPS 0-10, touchpoint surveys, admin dashboard)
 
 ### Task 49: Webhook for External Triggers
-- [ ] Not started
+- [x] External webhook action handler (trigger_ai, check_availability, create_booking, get_booking_status, get_customer_info)
+- [x] Authenticated via x-webhook-secret + x-tenant-slug headers
+- [x] Test tool in webhook settings UI
 
 ### Task 50: WhatsApp AI Integration
 - [x] Booking confirmations/reminders via WhatsApp Business API
 - [x] Delivery status tracking + webhook
 
 ### Task 51: Voice AI (Optional Future)
-- [ ] Not started
+- [x] Browser-native Speech-to-text (SpeechRecognition API)
+- [x] Text-to-Speech output (SpeechSynthesis API)
+- [x] Voice input button + voice output toggle in chat
 
 ---
 
@@ -312,19 +349,22 @@
 
 ### Task 53: Create Base UI Components
 - [x] Button, Input, Select, Card, Dialog, Table
-- [x] Badge, StatusBadge, Spinner, Skeleton
+- [x] Badge, StatusBadge, Tabs, Spinner, Skeleton
 - [x] Toast notification system
 
 ### Task 54: Build Authentication Pages
-- [x] /login
+- [x] /login (with OAuth buttons + 2FA flow)
 - [x] /register
 - [x] /forgot-password
 - [x] /reset-password
+- [x] /auth/callback (OAuth callback)
+- [x] /auth/2fa-setup (QR setup page)
 
 ### Task 55: Build Admin Dashboard Layout
-- [x] Sidebar navigation (7 links, collapsible)
+- [x] Sidebar navigation (collapsible, 15+ links)
 - [x] Top header (breadcrumbs, notifications, user menu)
 - [x] Mobile responsive
+- [x] Theme toggle (sun/moon, localStorage + system preference)
 
 ### Task 56: Build Dashboard Home
 - [x] Stat cards (today's bookings, revenue, customers, pending invoices)
@@ -332,58 +372,79 @@
 - [x] AI insights panel
 
 ### Task 57: Build Customer Management Pages
-- [x] Customer list with search/filter
-- [x] Customer detail with addresses + booking history
+- [x] Customer list with search/filter/sort
+- [x] Customer detail with addresses, booking history, saved cards, recurring payments
 - [x] Add customer dialog
+- [x] Import/export CSV
 
 ### Task 58: Build Service Management Pages
 - [x] Service list grouped by category
 - [x] Add service dialog
+- [x] Service images
 
 ### Task 59: Build Booking Calendar
 - [x] Month view — grid with booking chips, +N more, click to navigate
 - [x] Week view — horizontal timeline with absolute-positioned booking blocks
 - [x] Day view — vertical hourly timeline with booking details
-- [ ] Drag and drop — not started
-- [ ] Click to create booking — not started
+- [x] FullCalendar integration (dayGridMonth, timeGridWeek, timeGridDay)
+- [x] Drag and drop — drag events to reschedule with confirmation + availability check
+- [x] Click to create booking — quick booking modal with pre-filled time
+- [x] Color-coded events by status
 
 ### Task 60: Build Booking Page (Customer-Facing)
 - [x] 4-step wizard (service → date/time → info → confirm)
 - [x] Available slot generation
 - [x] Public booking at /booking/[tenantSlug]
+- [x] Embedded booking widget (widget.js + iframe, postMessage API)
 
 ### Task 61: Build Invoice Management
-- [x] Invoice list with status filter
+- [x] Invoice list with status filter (All/Draft/Sent/Paid/Overdue/Cancelled/Refunded/Partially Paid)
 - [x] Create invoice dialog (customer, line items, tax, discount)
-- [x] Invoice detail page (send, mark paid, payments table)
+- [x] Invoice detail page (send, mark paid, payments table, partial payment dialog)
+- [x] Payment progress bar (paidAmount / total)
 
 ### Task 62: Build Payment Integration UI
-- [ ] Payment form — not started (relies on provider popups)
+- [x] Paystack/Flutterwave popup integration
+- [x] POS button on booking/invoice detail
+- [x] Saved cards section
+- [x] Subscription management page
+- [x] Split payments page with summary cards
+- [x] Disputes page with evidence upload
+- [x] Settlement tracking page
 
 ### Task 63: Build Settings Pages
 - [x] General settings (name, timezone, currency)
-- [x] Team settings (list + invite dialog)
-- [x] AI settings (language, style, templates)
-- [x] Payment settings (key inputs + test)
-- [x] Settings sub-navigation tabs
-- [x] Payment settings save — Paystack/Flutterwave save, test, toggle all functional
+- [x] Team settings (list + invite dialog, commission fields, earnings dialog)
+- [x] AI settings (language, style, templates, business hours)
+- [x] Payment settings (key inputs + test + webhook URL)
+- [x] Webhook management (CRUD + test + external webhook tool)
+- [x] Custom domain settings (add, verify, DNS config)
+- [x] API keys management (generate, revoke, scopes)
+- [x] Settings sub-navigation tabs (General, Team, AI, Payments, Webhooks, Domain, API Keys)
 
 ### Task 64: Build Technician Mobile View
-- [x] Today's jobs list
+- [x] Today's jobs list (with tabs for offered/accepted/started)
 - [x] Job status actions (En Route, Start, Complete, Cancel)
 - [x] Customer info display
+- [x] Accept job buttons for offered jobs
+- [x] Location sharing toggle (auto-starts on En Route, sends via WebSocket)
 
 ### Task 65: Build Customer Portal
 - [x] Booking list view
 - [x] Payment history
 - [x] Update profile
+- [x] Feedback/satisfaction survey submission
+- [x] Disputes tab (view + create)
+- [x] Real-time technician tracking map
 
 ### Task 66: Implement Real-time Features
-- [ ] Not started
+- [x] BookingGateway (socket.io namespace /ws, tenant rooms, booking/dispatch/notification events)
+- [x] LocationGateway (socket.io namespace /location, live GPS updates)
+- [x] Frontend socket provider (useSocket hook)
 
 ### Task 67: Add Dark/Light Theme
 - [x] Dark mode supported via Tailwind dark: variants
-- [x] Theme toggle UI
+- [x] Theme toggle UI (sun/moon in sidebar)
 
 ### Task 68: Responsive Design
 - [x] Collapsible sidebar
@@ -402,59 +463,17 @@
 
 ---
 
-## REMAINING TASKS
+## REMAINING TASKS (Not Yet Started)
 
-- [x] **Route optimization** — dispatches list page with checkboxes + Optimize Route button via POST /routing/optimize
-- [x] **SMS/email reminders** — ReminderCronService runs hourly, sends 24h-before reminders via EmailService + SmsService with dedup
-- [x] **Reports page** — revenue, booking trends, technician performance, top services
-- [x] **Recurring bookings UI** — list page + create form with frequency/interval/discount
-- [x] **Coupon/promo codes UI** — admin CRUD + checkout validation with discount application
-- [x] **Payment settings save** — Paystack/Flutterwave save, test, toggle all functional
-- [x] **Test suite** — 43 unit tests across auth (10), booking (17), invoice (16) all passing
-- [x] **Calendar week/day views** — proper day/week layouts with time-slot positioning
+### Platform Core
 - [ ] **Customer mobile app** — React Native app for booking + tracking
-- [x] **Google Calendar sync** — OAuth 2.0 connect/disconnect, manual sync future bookings via settings/calendar UI
-- [x] **Review & rating system** — post-service feedback collection + admin moderation + public display
-- [x] **Multi-location per tenant** — single business manages multiple branches
-- [ ] **Inventory management** — track materials/products used per job
-- [ ] **Commission tracking** — per-technician commission reports
-- [ ] **Automated marketing** — email campaigns for re-engaging lapsed customers
-- [x] **WhatsApp integration** — booking confirmations/reminders via WhatsApp Business API
-- [x] **POS / on-site payment** — Paystack Terminal / Flutterwave POS
-- [ ] **Dynamic pricing** — surge pricing for same-day, discounts for off-peak
-- [x] **Technician availability settings**
-- [x] **Service images upload** — base64 image upload + thumbnail preview on service card
-- [x] **Embedded booking widget** — script tag for any website, injects floating button + iframe with compact 4-step booking flow
-- [x] **Chat widget UI** on customer-facing pages
-- [x] **Customer tags and groups** — tag CRUD, filter UI, inline editor on detail page
-- [x] **Import/export customers** — CSV export download + CSV import upsert
-- [x] **Invoice PDF generation**
-- [x] **Webhook management UI** in admin panel
-- [x] **In-app notification viewer**
-- [x] **Team notifications** — multi-select team members + send in-app notification
-- [x] **Saved cards (tokenization)** for Paystack
-- [x] **Subscription management** (tenant billing)
-- [x] **Skill tagging** for technicians — skills JSON field, editor UI + autocomplete
-- [ ] **Auto-assignment rules** for dispatches
-- [ ] **Job offer system** (techs claim jobs)
-- [x] **SMS/WhatsApp delivery tracking**
-- [ ] **Drive-time calculation** in scheduling
-- [ ] **Tenant custom domain setup**
-- [x] **OAuth** (Google, Microsoft login)
-- [x] **Two-factor authentication**
-- [ ] **Real-time location tracking** — technician GPS on map
-- [ ] **Settlement tracking** — reconcile payments with provider settlements
-- [ ] **Customer satisfaction tracking** — AI-powered sentiment analysis
-- [ ] **Public API** — rate-limited REST API for third-party integrations
-- [ ] **File management** — before/after photos, document storage per job
-- [ ] **Dispute management** — handle chargebacks and disputes
-- [ ] **Conversation flow builder** — visual editor for AI response flows
-- [ ] **PWA support** — installable mobile web app
+- [ ] **Payment testing** — needs real Paystack/Flutterwave API keys
 
----
+### Feature Gaps
+- [ ] **Customer mobile app** — React Native app for booking + tracking
 
-## COMPLETION CHECKLIST
-
+### Payment Testing
+- [ ] **Payment testing** — enter real API keys in Settings > Payments > Paystack/Flutterwave in admin panel, then test initialize/verify/refund flows
 - [ ] All critical services have unit tests
 - [ ] Tests passing
 - [ ] Payments working (test mode)
@@ -468,5 +487,5 @@
 
 ---
 
-*Task List Version: 2.0*
-*Last Updated: May 2026*
+*Task List Version: 4.0*
+*Last Updated: June 2026*

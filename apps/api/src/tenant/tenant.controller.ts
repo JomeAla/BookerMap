@@ -8,6 +8,7 @@ import {
   Body,
   UseGuards,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { TenantService } from './tenant.service';
 import { DomainService } from './domain.service';
@@ -16,6 +17,8 @@ import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { AddDomainDto } from './dto/add-domain.dto';
 import { VerifyDomainDto } from './dto/verify-domain.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('Tenants')
@@ -53,6 +56,9 @@ export class TenantController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update tenant', description: 'Update tenant information' })
   @ApiParam({ name: 'id', type: String, description: 'Tenant ID' })
   @ApiResponse({ status: 200, description: 'Tenant updated successfully' })
@@ -62,7 +68,8 @@ export class TenantController {
   }
 
   @Post('domain/add')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Add custom domain', description: 'Add a custom domain for the tenant\'s booking portal' })
   @ApiResponse({ status: 200, description: 'Domain added successfully' })
@@ -72,7 +79,8 @@ export class TenantController {
   }
 
   @Post('domain/verify')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Verify custom domain', description: 'Verify DNS record for the custom domain' })
   @ApiResponse({ status: 200, description: 'Domain verified successfully' })
@@ -82,7 +90,8 @@ export class TenantController {
   }
 
   @Delete('domain/remove')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Remove custom domain', description: 'Remove the custom domain configuration' })
   @ApiResponse({ status: 200, description: 'Domain removed successfully' })
@@ -91,7 +100,8 @@ export class TenantController {
   }
 
   @Get('domain/config')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get domain config', description: 'Get DNS configuration instructions for the custom domain' })
   @ApiResponse({ status: 200, description: 'Domain configuration' })

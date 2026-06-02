@@ -2,18 +2,22 @@ import {
   Controller, Post, Get, Patch, Delete,
   Body, Param, Req, UseGuards,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { FlowService } from './services/flow.service';
 import { CreateFlowDto, UpdateFlowDto, TestFlowDto } from './dto/flow.dto';
 
 @ApiTags('AI Flows')
 @Controller('ai/flows')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class FlowController {
   constructor(private readonly flowService: FlowService) {}
 
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Post()
   @ApiOperation({ summary: 'Create conversation flow' })
   @ApiResponse({ status: 201, description: 'Flow created' })
@@ -21,6 +25,7 @@ export class FlowController {
     return this.flowService.createFlow(req.user.tenantId, dto);
   }
 
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Get()
   @ApiOperation({ summary: 'List all conversation flows' })
   @ApiResponse({ status: 200, description: 'List of flows' })
@@ -28,6 +33,7 @@ export class FlowController {
     return this.flowService.getFlows(req.user.tenantId);
   }
 
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Get(':id')
   @ApiOperation({ summary: 'Get flow by ID' })
   @ApiResponse({ status: 200, description: 'Flow detail' })
@@ -35,6 +41,7 @@ export class FlowController {
     return this.flowService.getFlow(id, req.user.tenantId);
   }
 
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Patch(':id')
   @ApiOperation({ summary: 'Update flow' })
   @ApiResponse({ status: 200, description: 'Flow updated' })
@@ -42,6 +49,7 @@ export class FlowController {
     return this.flowService.updateFlow(id, req.user.tenantId, dto);
   }
 
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete flow' })
   @ApiResponse({ status: 200, description: 'Flow deleted' })
@@ -49,6 +57,7 @@ export class FlowController {
     return this.flowService.deleteFlow(id, req.user.tenantId);
   }
 
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Post(':id/duplicate')
   @ApiOperation({ summary: 'Duplicate flow' })
   @ApiResponse({ status: 201, description: 'Flow duplicated' })
@@ -56,6 +65,7 @@ export class FlowController {
     return this.flowService.duplicateFlow(id, req.user.tenantId);
   }
 
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Patch(':id/activate')
   @ApiOperation({ summary: 'Activate flow' })
   @ApiResponse({ status: 200, description: 'Flow activated' })
@@ -63,6 +73,7 @@ export class FlowController {
     return this.flowService.activateFlow(id, req.user.tenantId);
   }
 
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Patch(':id/deactivate')
   @ApiOperation({ summary: 'Deactivate flow' })
   @ApiResponse({ status: 200, description: 'Flow deactivated' })
@@ -70,6 +81,7 @@ export class FlowController {
     return this.flowService.deactivateFlow(id, req.user.tenantId);
   }
 
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Post(':id/test')
   @ApiOperation({ summary: 'Test flow execution' })
   @ApiResponse({ status: 200, description: 'Flow test result' })

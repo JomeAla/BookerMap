@@ -16,12 +16,14 @@ export class LoggingInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
     const { method, url } = request;
     const now = Date.now();
+    const requestId = request.headers['x-request-id'] || request.id || '';
 
     return next.handle().pipe(
       tap(() => {
         const response = context.switchToHttp().getResponse();
         const { statusCode } = response;
-        this.logger.log(`${method} ${url} ${statusCode} ${Date.now() - now}ms`);
+        const prefix = requestId ? `[${requestId}]` : '';
+        this.logger.log(`${prefix} ${method} ${url} ${statusCode} ${Date.now() - now}ms`);
       }),
     );
   }

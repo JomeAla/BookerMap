@@ -39,6 +39,7 @@ import { SatisfactionModule } from './satisfaction/satisfaction.module';
 import { DisputeModule } from './dispute/dispute.module';
 import { CommonModule } from './common/common.module';
 import { PublicApiModule } from './public-api/public-api.module';
+import { HealthModule } from './health/health.module';
 import { DomainResolverMiddleware } from './common/middleware/domain-resolver.middleware';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -87,6 +88,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     SatisfactionModule,
     DisputeModule,
     PublicApiModule,
+    HealthModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

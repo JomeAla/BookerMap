@@ -1,12 +1,17 @@
 import {
   Controller, Get, Post, Patch, Body, Param, Query, UseGuards, HttpException,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { DisputeService } from './dispute.service';
+import { CreateDisputeDto } from './dto/create-dispute.dto';
+import { AddEvidenceDto } from './dto/add-evidence.dto';
+import { UpdateDisputeStatusDto } from './dto/update-dispute-status.dto';
+import { ResolveDisputeDto } from './dto/resolve-dispute.dto';
 
 @Controller('disputes')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -17,9 +22,9 @@ export class DisputeController {
   async create(
     @TenantId() tenantId: string,
     @CurrentUser() user: any,
-    @Body() body: { type: string; description: string; amount: number; bookingId?: string; invoiceId?: string; customerId?: string },
+    @Body() body: CreateDisputeDto,
   ) {
-    const customerId = user.role === 'CUSTOMER' ? user.sub : body.customerId;
+    const customerId = user.role === UserRole.CUSTOMER ? user.sub : body.customerId;
     if (!customerId) throw new HttpException('customerId is required', 400);
     return this.disputeService.createDispute(tenantId, {
       customerId,
@@ -31,6 +36,7 @@ export class DisputeController {
     });
   }
 
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Get('stats')
   async stats(@TenantId() tenantId: string) {
     return this.disputeService.getDisputeStats(tenantId);
@@ -44,6 +50,7 @@ export class DisputeController {
     return this.disputeService.getCustomerDisputes(user.sub, tenantId);
   }
 
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Get()
   async findAll(
     @TenantId() tenantId: string,
@@ -68,7 +75,7 @@ export class DisputeController {
     @TenantId() tenantId: string,
     @Param('id') id: string,
     @CurrentUser() user: any,
-    @Body() body: { fileName: string; fileType: string; fileData: string; description?: string },
+    @Body() body: AddEvidenceDto,
   ) {
     return this.disputeService.addEvidence(id, tenantId, {
       fileName: body.fileName,
@@ -77,23 +84,23 @@ export class DisputeController {
     }, body.description || '', user.sub);
   }
 
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Patch(':id/status')
-  @Roles('ADMIN', 'OWNER', 'MANAGER')
   async updateStatus(
     @TenantId() tenantId: string,
     @Param('id') id: string,
-    @Body() body: { status: string },
+    @Body() body: UpdateDisputeStatusDto,
   ) {
     return this.disputeService.updateStatus(id, tenantId, body.status);
   }
 
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Post(':id/resolve')
-  @Roles('ADMIN', 'OWNER', 'MANAGER')
   async resolve(
     @TenantId() tenantId: string,
     @Param('id') id: string,
     @CurrentUser() user: any,
-    @Body() body: { resolution: string; note?: string },
+    @Body() body: ResolveDisputeDto,
   ) {
     return this.disputeService.resolveDispute(id, tenantId, body.resolution, body.note, user.sub);
   }
