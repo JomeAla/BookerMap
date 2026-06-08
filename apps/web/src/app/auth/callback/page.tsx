@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { setToken, setUser } from '@/lib/auth'
+import { setToken, setRefreshToken, setUser } from '@/lib/auth'
 import { api } from '@/lib/api'
 import { Spinner } from '@/components/ui/spinner'
 
@@ -16,6 +16,7 @@ export default function AuthCallbackPage() {
 
     if (accessToken && refreshToken) {
       setToken(accessToken)
+      setRefreshToken(refreshToken)
       api.get('/auth/me').then(({ data }) => {
         setUser(data.data || data)
         router.push('/dashboard')

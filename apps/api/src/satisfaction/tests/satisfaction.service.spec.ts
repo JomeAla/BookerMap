@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SatisfactionService } from '../satisfaction.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SentimentService } from '../sentiment.service';
 
 describe('SatisfactionService', () => {
   let service: SatisfactionService;
@@ -10,6 +11,7 @@ describe('SatisfactionService', () => {
     satisfactionSurvey: {
       create: jest.fn(),
       findMany: jest.fn(),
+      update: jest.fn(),
     },
     nPSResponse: {
       create: jest.fn(),
@@ -17,11 +19,17 @@ describe('SatisfactionService', () => {
     },
   };
 
+  const mockSentimentService = {
+    analyzeSurvey: jest.fn().mockResolvedValue({ score: 0.5, label: 'positive' }),
+    analyzeSentiment: jest.fn().mockReturnValue({ score: 0.5, label: 'positive', keywords: [], confidence: 0.8 }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SatisfactionService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: SentimentService, useValue: mockSentimentService },
       ],
     }).compile();
 
@@ -29,6 +37,7 @@ describe('SatisfactionService', () => {
     prisma = module.get(PrismaService);
 
     jest.clearAllMocks();
+    mockSentimentService.analyzeSurvey.mockResolvedValue({ score: 0.5, label: 'positive' });
   });
 
   it('should be defined', () => {

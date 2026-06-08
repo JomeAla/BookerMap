@@ -170,7 +170,7 @@ describe('DomainService', () => {
       const result = await service.resolveTenantFromDomain('test.bookermap.com');
 
       expect(result).toBeDefined();
-      expect(result.id).toBe('tenant-1');
+      expect(result!.id).toBe('tenant-1');
     });
 
     it('should return null if no tenant found for domain', async () => {

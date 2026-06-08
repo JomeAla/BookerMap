@@ -42,6 +42,27 @@ const DAY_LABELS: Record<string, string> = {
   friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
 }
 
+const TYPE_INFO: Record<string, { label: string; description: string; color: string; icon: React.ReactNode }> = {
+  SURGE: {
+    label: 'Surge',
+    description: 'Increases prices during high-demand periods. Use for same-day bookings, peak hours, or limited availability — incentivize early booking and maximize revenue.',
+    color: 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20',
+    icon: <ArrowUp className="h-5 w-5 text-red-600 dark:text-red-400" />,
+  },
+  OFF_PEAK: {
+    label: 'Off-Peak',
+    description: 'Discounts prices during low-demand periods. Attract customers during slow hours by offering reduced rates — fill your calendar and keep technicians busy.',
+    color: 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20',
+    icon: <ArrowDown className="h-5 w-5 text-green-600 dark:text-green-400" />,
+  },
+  PROMO: {
+    label: 'Promo',
+    description: 'Special promotional pricing for marketing campaigns. Use for seasonal offers, new service launches, or loyalty rewards — flexible positive or negative adjustments.',
+    color: 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20',
+    icon: <Percent className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
+  },
+}
+
 export default function PricingPage() {
   const queryClient = useQueryClient()
   const { addToast } = useToast()
@@ -174,7 +195,7 @@ export default function PricingPage() {
     setCalcResult(null)
     try {
       const service = services?.find(s => s.id === calcServiceId)
-      if (!service) { addToast('Service not found', 'error'); return }
+      if (!service) { addToast('Service not found', 'error'); setCalcLoading(false); return }
       const { data } = await api.post('/pricing/calculate', {
         serviceId: calcServiceId,
         dateTime: calcDateTime,
@@ -217,7 +238,7 @@ export default function PricingPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dynamic Pricing</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Surge pricing for same-day bookings and discount pricing for off-peak hours
+            Surge pricing for high-demand periods, off-peak discounts for slow hours, and promo rules for campaigns
           </p>
         </div>
         <Dialog open={formOpen} onOpenChange={(v) => { setFormOpen(v); if (!v) resetForm() }}>
@@ -287,12 +308,30 @@ export default function PricingPage() {
         </Dialog>
       </div>
 
+      {/* Summary banner explaining pricing types */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {(['SURGE', 'OFF_PEAK', 'PROMO'] as const).map((type) => {
+          const info = TYPE_INFO[type]
+          return (
+            <div key={type} className={`rounded-lg border p-4 ${info.color}`}>
+              <div className="flex items-center gap-2 mb-2">
+                {info.icon}
+                <span className="font-semibold text-sm text-gray-900 dark:text-white">{info.label}</span>
+              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                {info.description}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Calculator className="h-4 w-4" /> Calculate Preview
+            <Calculator className="h-4 w-4" /> Test Pricing
           </CardTitle>
-          <CardDescription>Select a service and date/time to preview the calculated price</CardDescription>
+          <CardDescription>Select a service and date/time to preview the calculated price with applied rules</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex gap-3 items-end">
@@ -324,7 +363,8 @@ export default function PricingPage() {
                     <div key={r.id} className="flex items-center justify-between text-xs text-gray-500">
                       <span>{r.name} ({r.type})</span>
                       <span className={r.adjustmentValue >= 0 ? 'text-red-500' : 'text-green-500'}>
-                        {r.adjustmentValue >= 0 ? '+' : ''}{r.adjustmentValue}{'%'}
+                        {r.adjustmentValue >= 0 ? '+' : ''}{r.adjustmentValue}
+                        {typeof r.adjustmentValue === 'number' ? (rules?.find(x => x.id === r.id)?.adjustmentType === 'PERCENTAGE' ? '%' : '') : '%'}
                       </span>
                     </div>
                   ))}

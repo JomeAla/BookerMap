@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ServiceWorkerRegistry } from "@/components/pwa/service-worker-registry";
-import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { PwaProvider } from "@/components/pwa/pwa-provider";
+import { Providers } from "@/lib/providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,11 +16,27 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BookerMap - Multi-Tenant Booking Platform",
-  description: "Manage bookings, customers, and payments across multiple locations",
+  title: "BookerMap — Smart Booking Platform for Home Service Businesses",
+  description:
+    "All-in-one booking platform for African home service businesses. Manage bookings, dispatch technicians, process payments via Paystack and Flutterwave, and grow your business with BookerMap.",
   manifest: "/manifest.json",
+  keywords: ["booking software", "scheduling platform", "home services", "dispatch management", "payment processing", "African businesses", "Nigeria", "Ghana", "Kenya", "South Africa"],
+  openGraph: {
+    title: "BookerMap — Smart Booking Platform for Home Service Businesses",
+    description:
+      "All-in-one booking platform for African home service businesses. Manage bookings, dispatch technicians, process payments, and grow your business with BookerMap.",
+    type: "website",
+    siteName: "BookerMap",
+    locale: "en_US",
+    images: [{ url: "/icons/icon.svg", width: 512, height: 512 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "BookerMap — Smart Booking Platform",
+    description: "All-in-one booking platform for African home service businesses.",
+  },
   other: {
-    "theme-color": "#3b82f6",
+    "theme-color": "#D97706",
     "apple-mobile-web-app-capable": "yes",
     "apple-mobile-web-app-status-bar-style": "default",
     "apple-mobile-web-app-title": "BookerMap",
@@ -38,22 +55,31 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <link rel="manifest" href="/manifest.json" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <meta name="theme-color" content="#3b82f6" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="BookerMap" />
-        <link rel="apple-touch-icon" href="/icons/icon.svg" />
-        <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
-        <script dangerouslySetInnerHTML={{
-          __html: `try { const t = localStorage.getItem('theme'); if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark') } catch(e) {}`
-        }} />
+        <link
+          rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        />
+        <Script
+          id="dark-mode"
+          strategy="beforeInteractive"
+        >{`try { const t = localStorage.getItem('theme'); if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark') } catch(e) {}`}</Script>
+        <Script
+          id="json-ld"
+          type="application/ld+json"
+          strategy="beforeInteractive"
+        >{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          "name": "BookerMap",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Web",
+          "description": "All-in-one booking platform for African home service businesses. Manage bookings, dispatch technicians, process payments via Paystack and Flutterwave.",
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "14-day free trial" },
+          "aggregateRating": { "@type": "AggregateRating", "ratingValue": "4.8", "reviewCount": "127" },
+        })}</Script>
       </head>
       <body className="min-h-full">
-        {children}
-        <ServiceWorkerRegistry />
-        <InstallPrompt />
+        <Providers><PwaProvider>{children}</PwaProvider></Providers>
       </body>
     </html>
   );

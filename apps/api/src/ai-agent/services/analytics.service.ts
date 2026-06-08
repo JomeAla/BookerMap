@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -108,6 +108,119 @@ export class AnalyticsService {
       messageCount: conv.messages.length,
       lastMessage: conv.messages.length > 0 ? conv.messages[conv.messages.length - 1].content : '',
       createdAt: conv.createdAt,
+    }));
+  }
+
+  async rateMessage(messageId: string, tenantId: string, userId: string, rating: number, feedback?: string) {
+    const message = await this.prisma.aiMessage.findUnique({
+      where: { id: messageId },
+      include: { conversation: { select: { tenantId: true } } },
+    });
+
+    if (!message) {
+      throw new NotFoundException('Message not found');
+    }
+    if (message.conversation.tenantId !== tenantId) {
+      throw new ForbiddenException('You cannot rate messages from another tenant');
+    }
+    if (message.role !== 'assistant') {
+      throw new ForbiddenException('Only assistant messages can be rated');
+    }
+
+    return this.prisma.aiMessage.update({
+      where: { id: messageId },
+      data: {
+        rating,
+        feedback: feedback ?? null,
+        ratedBy: userId,
+        ratedAt: new Date(),
+      },
+      select: {
+        id: true,
+        rating: true,
+        feedback: true,
+        ratedBy: true,
+        ratedAt: true,
+      },
+    });
+  }
+
+  async getFeedbackStats(tenantId: string) {
+    const rated = await this.prisma.aiMessage.findMany({
+      where: {
+        role: 'assistant',
+        rating: { not: null },
+        conversation: { tenantId },
+      },
+      select: { rating: true },
+    });
+
+    const totalRated = rated.length;
+    if (totalRated === 0) {
+      return {
+        totalRated: 0,
+        avgRating: 0,
+        percentPositive: 0,
+        percentNegative: 0,
+        ratingBreakdown: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      };
+    }
+
+    let sum = 0;
+    let positive = 0;
+    let negative = 0;
+    const breakdown: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+
+    for (const msg of rated) {
+      const r = msg.rating!;
+      sum += r;
+      if (r >= 4) positive += 1;
+      if (r <= 2) negative += 1;
+      if (breakdown[r] !== undefined) breakdown[r] += 1;
+    }
+
+    return {
+      totalRated,
+      avgRating: Math.round((sum / totalRated) * 100) / 100,
+      percentPositive: Math.round((positive / totalRated) * 10000) / 100,
+      percentNegative: Math.round((negative / totalRated) * 10000) / 100,
+      ratingBreakdown: breakdown,
+    };
+  }
+
+  async getRecentRatedMessages(tenantId: string, limit: number = 20) {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const messages = await this.prisma.aiMessage.findMany({
+      where: {
+        role: 'assistant',
+        rating: { not: null },
+        conversation: { tenantId },
+      },
+      orderBy: { ratedAt: 'desc' },
+      take: safeLimit,
+      include: {
+        conversation: {
+          select: {
+            id: true,
+            sessionId: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    return messages.map((m) => ({
+      id: m.id,
+      content: m.content,
+      contentSnippet: m.content.length > 160 ? `${m.content.slice(0, 160)}...` : m.content,
+      intent: m.intent,
+      rating: m.rating,
+      feedback: m.feedback,
+      ratedBy: m.ratedBy,
+      ratedAt: m.ratedAt,
+      createdAt: m.createdAt,
+      conversationId: m.conversationId,
+      sessionId: m.conversation.sessionId,
     }));
   }
 }

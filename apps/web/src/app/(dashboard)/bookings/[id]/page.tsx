@@ -11,11 +11,11 @@ import { StatusBadge, Badge } from '@/components/ui/badge'
 import { PageLoader } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowLeft, User, Phone, Mail, Clock, Wrench, DollarSign, MapPin, Star, Package, Plus, Upload, Trash2, FileIcon, Navigation } from 'lucide-react'
+import { ArrowLeft, User, Phone, Mail, Clock, Wrench, DollarSign, MapPin, Star, Package, Plus, Upload, Trash2, FileIcon, Navigation, CreditCard } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import dynamic from 'next/dynamic'
-import type { Booking, Dispatch, Review, BookingInventory, InventoryItem, BookingFile, LocationUpdate } from '@/types'
+import type { Booking, Dispatch, Review, BookingInventory, InventoryItem, BookingFile, LocationUpdate, Terminal } from '@/types'
 import { JobStatus } from '@/types'
 
 const TechnicianTracker = dynamic(() => import('@/components/map/technician-tracker'), { ssr: false })
@@ -201,6 +201,22 @@ export default function BookingDetailPage() {
                 Mark as {status.replace('_', ' ')}
               </Button>
             ))}
+            {booking.invoices && booking.invoices.length > 0 && booking.invoices[0].status !== 'PAID' && booking.invoices[0].status !== 'CANCELLED' && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  const el = document.getElementById('pos-payment-section')
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth' })
+                    const posBtn = el.querySelector('button') as HTMLButtonElement
+                    if (posBtn) posBtn.click()
+                  }
+                }}
+              >
+                <CreditCard className="h-4 w-4 mr-1" /> Pay via Terminal
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -344,24 +360,52 @@ function PosPaymentSection({ booking }: { booking: Booking }) {
   const [posReference, setPosReference] = React.useState('')
   const [posStatus, setPosStatus] = React.useState<string | null>(null)
   const [posLoading, setPosLoading] = React.useState(false)
+  const [posAmount, setPosAmount] = React.useState('')
+  const [posProvider, setPosProvider] = React.useState<'paystack' | 'flutterwave'>('paystack')
+  const [posTerminalId, setPosTerminalId] = React.useState('')
 
   const invoice = booking.invoices?.[0]
   const isUnpaid = invoice && invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && invoice.status !== 'REFUNDED'
 
+  const { data: terminals } = useQuery({
+    queryKey: ['terminals'],
+    queryFn: async () => {
+      const { data } = await api.get('/payments/terminals')
+      return data.data as Terminal[]
+    },
+    enabled: posDialogOpen,
+  })
+
+  React.useEffect(() => {
+    if (!posDialogOpen) {
+      setPosReference('')
+      setPosStatus(null)
+      setPosAmount('')
+      setPosProvider('paystack')
+      setPosTerminalId('')
+    }
+  }, [posDialogOpen])
+
   async function handleGeneratePos() {
     if (!invoice) return
+    const amount = Number(posAmount) || invoice.total
+    if (!Number.isFinite(amount) || amount <= 0) {
+      addToast('Enter a valid amount', 'error')
+      return
+    }
     setPosLoading(true)
     setPosStatus(null)
     try {
       const { data } = await api.post('/payments/pos/initialize', {
-        amount: invoice.total,
-        provider: 'paystack',
+        amount,
+        provider: posProvider,
         invoiceId: invoice.id,
         bookingId: booking.id,
+        terminalId: posTerminalId || undefined,
       })
       setPosReference(data.data.reference)
       setPosStatus('initialized')
-      addToast('POS payment initialized', 'success')
+      addToast('POS payment initialized. Reference: ' + data.data.reference, 'success')
     } catch {
       addToast('Failed to initialize POS payment', 'error')
     } finally {
@@ -390,26 +434,64 @@ function PosPaymentSection({ booking }: { booking: Booking }) {
   if (!isUnpaid) return null
 
   return (
-    <>
+    <div id="pos-payment-section">
       <Card>
-        <CardHeader><CardTitle className="text-base">Pay with POS</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Pay with Terminal</CardTitle></CardHeader>
         <CardContent>
           <Button size="sm" variant="secondary" onClick={() => setPosDialogOpen(true)}>
-            Pay with POS
+            <CreditCard className="h-4 w-4 mr-1" /> Pay via Terminal
           </Button>
         </CardContent>
       </Card>
 
       <Dialog open={posDialogOpen} onOpenChange={setPosDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>POS Payment</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Terminal Payment</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Amount: {formatCurrency(invoice?.total || 0)}
+              Invoice: {invoice?.invoiceNumber} — {formatCurrency(invoice?.total || 0)}
             </p>
+
+            <Input
+              label="Amount"
+              type="number"
+              value={posAmount}
+              onChange={(e) => setPosAmount(e.target.value)}
+              placeholder={`${invoice?.total || 0}`}
+              min="1"
+              step="0.01"
+            />
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Provider</label>
+              <select
+                className="flex h-9 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                value={posProvider}
+                onChange={(e) => setPosProvider(e.target.value as 'paystack' | 'flutterwave')}
+              >
+                <option value="paystack">Paystack</option>
+                <option value="flutterwave">Flutterwave</option>
+              </select>
+            </div>
+
+            {terminals && terminals.length > 0 && (
+              <Select
+                label="Terminal"
+                options={[
+                  { value: '', label: 'Auto-select' },
+                  ...terminals.map((t) => ({
+                    value: t.id,
+                    label: `${t.name} ${t.status === 'online' || t.status === 'active' ? '(Online)' : '(Offline)'}`,
+                  })),
+                ]}
+                value={posTerminalId}
+                onChange={(e) => setPosTerminalId(e.target.value)}
+              />
+            )}
+
             {!posReference ? (
               <Button className="w-full" onClick={handleGeneratePos} disabled={posLoading}>
-                {posLoading ? 'Initializing...' : 'Generate POS Payment'}
+                {posLoading ? 'Sending to Terminal...' : 'Send to Terminal'}
               </Button>
             ) : (
               <div className="space-y-3">
@@ -437,7 +519,7 @@ function PosPaymentSection({ booking }: { booking: Booking }) {
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   )
 }
 

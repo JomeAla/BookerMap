@@ -146,8 +146,9 @@ model Tenant {
   bookings          Booking[]
   invoices          Invoice[]
   notifications     Notification[]
-  webhooks          Webhook[]
-  aiResponses       AiResponse[]
+  webhooks            Webhook[]
+  webhookDeliveries   WebhookDelivery[]
+  aiResponses         AiResponse[]
   aiConversations   AiConversation[]
   paymentSettings   PaymentSettings[]
   coupons           Coupon[]
@@ -161,6 +162,7 @@ model Tenant {
   escalations       Escalation[]
   subscription      Subscription?
   conversationFlows ConversationFlow[]
+  bulkSmsCampaigns  BulkSmsCampaign[]
 
   @@map("tenants")
 }
@@ -239,6 +241,7 @@ model User {
   jobAssignments      Dispatch[]           @relation("AssignedUser")
   reviews             Review[]             @relation("TechnicianReviews")
   refreshTokens       RefreshToken[]
+  pushSubscriptions   PushSubscription[]
   notifications       Notification[]
   googleCalendarToken GoogleCalendarToken?
   commissionRate      Float?
@@ -251,6 +254,7 @@ model User {
   disputesAsCustomer  Dispute[]            @relation("Disputant")
   resolvedDisputes    Dispute[]            @relation("Resolver")
   disputeEvidence     DisputeEvidence[]
+  bulkSmsCampaigns    BulkSmsCampaign[]
 
   @@unique([tenantId, email])
   @@map("users")
@@ -280,6 +284,7 @@ model Customer {
   recurringPayments   RecurringPayment[]
   satisfactionSurveys SatisfactionSurvey[]
   npsResponses        NPSResponse[]
+  bulkSmsRecipients   BulkSmsRecipient[]
 
   @@unique([tenantId, phone])
   @@map("customers")
@@ -718,7 +723,33 @@ model Webhook {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  deliveries WebhookDelivery[]
+
   @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id             String   @id @default(cuid())
+  webhookId      String
+  webhook        Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  event          String
+  payload        Json
+  status         String   @default("PENDING")
+  attempts       Int      @default(0)
+  lastAttemptAt  DateTime?
+  nextRetryAt    DateTime?
+  responseStatus Int?
+  responseBody   String?
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([webhookId])
+  @@index([status, nextRetryAt])
+  @@index([tenantId])
+  @@map("webhook_deliveries")
 }
 
 model ConversationFlow {
@@ -782,11 +813,17 @@ model AiMessage {
   content   String
   intent    String?
   entities  Json?
+  rating    Int?
+  feedback  String?
+  ratedBy   String?
+  ratedAt   DateTime?
   createdAt DateTime @default(now())
 
   conversationId String
   conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
+  @@index([conversationId, role])
+  @@index([rating])
   @@map("ai_messages")
 }
 
@@ -867,6 +904,19 @@ model RefreshToken {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 model InventoryItem {
@@ -1208,4 +1258,45 @@ model DisputeEvidence {
 
   @@index([disputeId])
   @@map("dispute_evidence")
+}
+
+model BulkSmsCampaign {
+  id             String    @id @default(cuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name           String
+  message        String
+  segment        Json?
+  recipientCount Int       @default(0)
+  sentCount      Int       @default(0)
+  failedCount    Int       @default(0)
+  totalCost      Float     @default(0)
+  status         String    @default("DRAFT")
+  scheduledAt    DateTime?
+  completedAt    DateTime?
+  createdById    String?
+  createdBy      User?     @relation(fields: [createdById], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  recipients     BulkSmsRecipient[]
+
+  @@index([tenantId])
+  @@map("bulk_sms_campaigns")
+}
+
+model BulkSmsRecipient {
+  id                String           @id @default(cuid())
+  campaignId        String
+  campaign          BulkSmsCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customerId        String?
+  customer          Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  phone             String
+  status            String           @default("PENDING")
+  sentAt            DateTime?
+  errorMessage      String?
+  providerMessageId String?
+  createdAt         DateTime         @default(now())
+
+  @@index([campaignId])
+  @@map("bulk_sms_recipients")
 }

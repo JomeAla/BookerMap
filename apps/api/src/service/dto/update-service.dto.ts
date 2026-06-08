@@ -59,6 +59,10 @@ export class UpdateServiceDto {
 
   @IsOptional()
   @IsString()
+  locationId?: string;
+
+  @IsOptional()
+  @IsString()
   categoryId?: string;
 
   @IsOptional()

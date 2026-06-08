@@ -76,7 +76,7 @@ describe('PaymentService', () => {
 
   describe('handlePaymentSuccess', () => {
     it('should handle partial payment and update paidAmount', async () => {
-      mockPrisma.payment.findUnique.mockResolvedValue({
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
         id: 'pay-1', amount: 3000, status: 'PENDING', invoiceId: 'inv-1',
       });
       mockPrisma.invoice.findUnique.mockResolvedValue({
@@ -101,7 +101,7 @@ describe('PaymentService', () => {
     });
 
     it('should mark invoice as PAID when fully paid', async () => {
-      mockPrisma.payment.findUnique.mockResolvedValue({
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
         id: 'pay-1', amount: 10000, status: 'PENDING', invoiceId: 'inv-1',
       });
       mockPrisma.invoice.findUnique.mockResolvedValue({

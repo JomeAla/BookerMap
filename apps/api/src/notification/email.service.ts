@@ -1,5 +1,35 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  bookingConfirmation,
+  bookingReminder,
+  invoiceEmail,
+  invoiceReminder,
+  paymentReceipt,
+  passwordReset,
+  welcomeEmail,
+  teamInvite,
+  feedbackRequest,
+  campaignEmail,
+  disputeOpened,
+  disputeResolved,
+  renderTemplate,
+  renderHandlebars,
+  TemplateName,
+  TemplateData,
+  BookingConfirmationData,
+  BookingReminderData,
+  InvoiceEmailData,
+  InvoiceReminderData,
+  PaymentReceiptData,
+  PasswordResetData,
+  WelcomeEmailData,
+  TeamInviteData,
+  FeedbackRequestData,
+  CampaignEmailData,
+  DisputeOpenedData,
+  DisputeResolvedData,
+} from './email-templates';
 
 interface MailOptions {
   to: string;
@@ -63,7 +93,7 @@ export class EmailService {
     if (this.transporter) {
       try {
         await this.transporter.sendMail({
-          from: this.configService.get<string>('SMTP_FROM') || 'noreply@bookermap.com',
+          from: this.configService.get<string>('SMTP_FROM') || 'BookerMap <noreply@bookermap.com>',
           to: options.to,
           subject: options.subject,
           text: options.text,
@@ -78,41 +108,181 @@ export class EmailService {
     }
   }
 
+  async sendTemplate(to: string, name: TemplateName, data: TemplateData, subjectOverride?: string): Promise<void> {
+    const rendered = renderTemplate(name, data);
+    const subject = subjectOverride || rendered.subject;
+    await this.sendMail({ to, subject, text: rendered.text, html: rendered.html });
+  }
+
+  renderHandlebars(template: string, data: Record<string, unknown>): string {
+    return renderHandlebars(template, data);
+  }
+
   async sendBookingConfirmation(customerEmail: string, details: BookingDetails): Promise<void> {
-    const subject = `Booking Confirmed - ${details.serviceName}`;
-    const text = `Hi ${details.customerName},\n\nYour booking has been confirmed!\n\nService: ${details.serviceName}\nDate: ${details.startTime.toLocaleString()}\nPrice: $${details.totalPrice}\n\nThank you for choosing our service.`;
-    const html = `<!DOCTYPE html><html><head><style>body{font-family:Arial,sans-serif;color:#333}.header{background:#3B82F6;color:#fff;padding:20px;text-align:center}.content{padding:20px}.footer{padding:20px;font-size:12px;color:#666;text-align:center;border-top:1px solid #eee}</style></head><body><div class="header"><h2>Booking Confirmed!</h2></div><div class="content"><p>Hi <strong>${details.customerName}</strong>,</p><p>Your booking has been confirmed.</p><table style="width:100%;border-collapse:collapse"><tr><td style="padding:8px;font-weight:bold">Service:</td><td style="padding:8px">${details.serviceName}</td></tr><tr><td style="padding:8px;font-weight:bold">Date:</td><td style="padding:8px">${details.startTime.toLocaleString()}</td></tr><tr><td style="padding:8px;font-weight:bold">Price:</td><td style="padding:8px">$${details.totalPrice}</td></tr></table></div><div class="footer"><p>Thank you for choosing our service!</p></div></body></html>`;
-    await this.sendMail({ to: customerEmail, subject, text, html });
+    const data: BookingConfirmationData = {
+      customerName: details.customerName,
+      serviceName: details.serviceName,
+      startTime: details.startTime,
+      endTime: details.endTime,
+      technicianName: details.technicianName,
+      address: details.address,
+      totalPrice: details.totalPrice,
+      bookingId: details.id,
+    };
+    const tpl = bookingConfirmation(data);
+    await this.sendMail({
+      to: customerEmail,
+      subject: `Booking Confirmed - ${details.serviceName}`,
+      text: tpl.text,
+      html: tpl.html,
+    });
   }
 
   async sendBookingReminder(customerEmail: string, details: BookingDetails): Promise<void> {
-    const subject = `Reminder: ${details.serviceName} in 24 hours`;
-    const text = `Hi ${details.customerName},\n\nThis is a reminder that your appointment is in 24 hours.\n\nService: ${details.serviceName}\nDate: ${details.startTime.toLocaleString()}\nAddress: ${details.address || 'N/A'}\n\nPlease be available at the scheduled time.`;
-    const html = `<!DOCTYPE html><html><head><style>body{font-family:Arial,sans-serif;color:#333}.header{background:#F59E0B;color:#fff;padding:20px;text-align:center}.content{padding:20px}.footer{padding:20px;font-size:12px;color:#666;text-align:center;border-top:1px solid #eee}</style></head><body><div class="header"><h2>Appointment Reminder</h2></div><div class="content"><p>Hi <strong>${details.customerName}</strong>,</p><p>Your appointment is in <strong>24 hours</strong>.</p><table style="width:100%;border-collapse:collapse"><tr><td style="padding:8px;font-weight:bold">Service:</td><td style="padding:8px">${details.serviceName}</td></tr><tr><td style="padding:8px;font-weight:bold">Date:</td><td style="padding:8px">${details.startTime.toLocaleString()}</td></tr><tr><td style="padding:8px;font-weight:bold">Address:</td><td style="padding:8px">${details.address || 'N/A'}</td></tr></table></div><div class="footer"><p>Please be available at the scheduled time.</p></div></body></html>`;
-    await this.sendMail({ to: customerEmail, subject, text, html });
+    const data: BookingReminderData = {
+      customerName: details.customerName,
+      serviceName: details.serviceName,
+      startTime: details.startTime,
+      endTime: details.endTime,
+      technicianName: details.technicianName,
+      address: details.address,
+      totalPrice: details.totalPrice,
+      bookingId: details.id,
+      hoursAway: 24,
+    };
+    const tpl = bookingReminder(data);
+    await this.sendMail({
+      to: customerEmail,
+      subject: `Reminder: ${details.serviceName} in 24 hours`,
+      text: tpl.text,
+      html: tpl.html,
+    });
   }
 
   async sendInvoiceEmail(customerEmail: string, details: InvoiceDetails): Promise<void> {
-    const subject = `Invoice ${details.invoiceNumber} - $${details.amount.toFixed(2)}`;
-    const itemsHtml = (details.items || []).map(
-      (item) => `<tr><td style="padding:8px;border-bottom:1px solid #eee">${item.description}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${item.quantity}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">$${item.unitPrice.toFixed(2)}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">$${item.total.toFixed(2)}</td></tr>`
-    ).join('');
-    const text = `Hi ${details.customerName},\n\nInvoice ${details.invoiceNumber} for $${details.amount.toFixed(2)} is due by ${details.dueDate.toLocaleDateString()}.\n\nPayment link: ${details.paymentLink || 'N/A'}\n\nPlease pay before the due date.`;
-    const html = `<!DOCTYPE html><html><head><style>body{font-family:Arial,sans-serif;color:#333}.header{background:#10B981;color:#fff;padding:20px;text-align:center}.content{padding:20px}.footer{padding:20px;font-size:12px;color:#666;text-align:center;border-top:1px solid #eee}</style></head><body><div class="header"><h2>Invoice ${details.invoiceNumber}</h2></div><div class="content"><p>Hi <strong>${details.customerName}</strong>,</p><p>Your invoice is ready.</p><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f9fafb"><th style="padding:8px;text-align:left">Description</th><th style="padding:8px;text-align:center">Qty</th><th style="padding:8px;text-align:right">Unit Price</th><th style="padding:8px;text-align:right">Total</th></tr></thead><tbody>${itemsHtml}</tbody></table><p style="font-size:18px;font-weight:bold;text-align:right;margin-top:16px">Total: $${details.amount.toFixed(2)}</p><p style="text-align:right">Due: ${details.dueDate.toLocaleDateString()}</p><div style="text-align:center;margin-top:24px"><a href="${details.paymentLink || '#'}" style="background:#3B82F6;color:#fff;padding:12px 32px;text-decoration:none;border-radius:6px;display:inline-block">Pay Now</a></div></div><div class="footer"><p>Please pay before the due date.</p></div></body></html>`;
-    await this.sendMail({ to: customerEmail, subject, text, html });
+    const data: InvoiceEmailData = {
+      invoiceNumber: details.invoiceNumber,
+      customerName: details.customerName,
+      amount: details.amount,
+      dueDate: details.dueDate,
+      paymentLink: details.paymentLink,
+      items: details.items,
+    };
+    const tpl = invoiceEmail(data);
+    await this.sendMail({
+      to: customerEmail,
+      subject: `Invoice ${details.invoiceNumber} - $${details.amount.toFixed(2)}`,
+      text: tpl.text,
+      html: tpl.html,
+    });
   }
 
-  async sendInvoiceReminder(customerEmail: string, details: { invoiceNumber: string; customerName: string; amount: number; dueDate: Date; invoiceId: string }): Promise<void> {
-    const subject = `Reminder: Invoice ${details.invoiceNumber} is due`;
-    const text = `Hi ${details.customerName},\n\nThis is a reminder that Invoice ${details.invoiceNumber} for $${details.amount.toFixed(2)} was due on ${details.dueDate.toLocaleDateString()}.\n\nPlease make your payment as soon as possible to avoid any late fees.\n\nThank you for your business.`;
-    const html = `<!DOCTYPE html><html><head><style>body{font-family:Arial,sans-serif;color:#333}.header{background:#EF4444;color:#fff;padding:20px;text-align:center}.content{padding:20px}.footer{padding:20px;font-size:12px;color:#666;text-align:center;border-top:1px solid #eee}</style></head><body><div class="header"><h2>Payment Reminder</h2></div><div class="content"><p>Hi <strong>${details.customerName}</strong>,</p><p>This is a reminder that Invoice <strong>${details.invoiceNumber}</strong> for <strong>$${details.amount.toFixed(2)}</strong> was due on <strong>${details.dueDate.toLocaleDateString()}</strong>.</p><p>Please make your payment as soon as possible to avoid any late fees.</p></div><div class="footer"><p>Thank you for your business!</p></div></body></html>`;
-    await this.sendMail({ to: customerEmail, subject, text, html });
+  async sendInvoiceReminder(
+    customerEmail: string,
+    details: { invoiceNumber: string; customerName: string; amount: number; dueDate: Date; invoiceId: string; daysOverdue?: number },
+  ): Promise<void> {
+    const data: InvoiceReminderData = {
+      invoiceNumber: details.invoiceNumber,
+      customerName: details.customerName,
+      amount: details.amount,
+      dueDate: details.dueDate,
+      invoiceId: details.invoiceId,
+      daysOverdue: details.daysOverdue,
+    };
+    const tpl = invoiceReminder(data);
+    const subject = details.daysOverdue && details.daysOverdue > 0
+      ? `Overdue: Invoice ${details.invoiceNumber}`
+      : `Reminder: Invoice ${details.invoiceNumber} is due`;
+    await this.sendMail({ to: customerEmail, subject, text: tpl.text, html: tpl.html });
   }
 
-  async sendFeedbackRequest(customerEmail: string, details: { customerName: string; serviceName: string; bookingId: string }): Promise<void> {
-    const subject = `How was your ${details.serviceName} experience?`;
-    const text = `Hi ${details.customerName},\n\nWe'd love to hear about your recent ${details.serviceName} experience. Please take a moment to leave a review.\n\nThank you!`;
-    const html = `<!DOCTYPE html><html><head><style>body{font-family:Arial,sans-serif;color:#333}.header{background:#8B5CF6;color:#fff;padding:20px;text-align:center}.content{padding:20px;text-align:center}.footer{padding:20px;font-size:12px;color:#666;text-align:center;border-top:1px solid #eee}</style></head><body><div class="header"><h2>We Value Your Feedback!</h2></div><div class="content"><p>Hi <strong>${details.customerName}</strong>,</p><p>How was your <strong>${details.serviceName}</strong> experience?</p><p>Your feedback helps us improve.</p></div><div class="footer"><p>Thank you for choosing our service!</p></div></body></html>`;
-    await this.sendMail({ to: customerEmail, subject, text, html });
+  async sendPaymentReceipt(customerEmail: string, details: PaymentReceiptData): Promise<void> {
+    const tpl = paymentReceipt(details);
+    await this.sendMail({
+      to: customerEmail,
+      subject: `Payment Received - ${details.reference}`,
+      text: tpl.text,
+      html: tpl.html,
+    });
+  }
+
+  async sendPasswordReset(customerEmail: string, details: PasswordResetData): Promise<void> {
+    const tpl = passwordReset(details);
+    await this.sendMail({
+      to: customerEmail,
+      subject: 'Reset your BookerMap password',
+      text: tpl.text,
+      html: tpl.html,
+    });
+  }
+
+  async sendWelcomeEmail(customerEmail: string, details: WelcomeEmailData): Promise<void> {
+    const tpl = welcomeEmail(details);
+    await this.sendMail({
+      to: customerEmail,
+      subject: 'Welcome to BookerMap!',
+      text: tpl.text,
+      html: tpl.html,
+    });
+  }
+
+  async sendTeamInvite(inviteeEmail: string, details: TeamInviteData): Promise<void> {
+    const tpl = teamInvite(details);
+    await this.sendMail({
+      to: inviteeEmail,
+      subject: `${details.inviterName} invited you to ${details.companyName}`,
+      text: tpl.text,
+      html: tpl.html,
+    });
+  }
+
+  async sendFeedbackRequest(
+    customerEmail: string,
+    details: { customerName: string; serviceName: string; bookingId: string; technicianName?: string; surveyUrl?: string },
+  ): Promise<void> {
+    const data: FeedbackRequestData = {
+      customerName: details.customerName,
+      serviceName: details.serviceName,
+      bookingId: details.bookingId,
+      technicianName: details.technicianName,
+      surveyUrl: details.surveyUrl,
+    };
+    const tpl = feedbackRequest(data);
+    await this.sendMail({
+      to: customerEmail,
+      subject: `How was your ${details.serviceName} experience?`,
+      text: tpl.text,
+      html: tpl.html,
+    });
+  }
+
+  async sendCampaignEmail(recipientEmail: string, details: CampaignEmailData): Promise<void> {
+    const tpl = campaignEmail(details);
+    await this.sendMail({
+      to: recipientEmail,
+      subject: details.subject,
+      text: tpl.text,
+      html: tpl.html,
+    });
+  }
+
+  async sendDisputeOpened(customerEmail: string, details: DisputeOpenedData): Promise<void> {
+    const tpl = disputeOpened(details);
+    await this.sendMail({
+      to: customerEmail,
+      subject: `Dispute opened: ${details.disputeId}`,
+      text: tpl.text,
+      html: tpl.html,
+    });
+  }
+
+  async sendDisputeResolved(customerEmail: string, details: DisputeResolvedData): Promise<void> {
+    const tpl = disputeResolved(details);
+    await this.sendMail({
+      to: customerEmail,
+      subject: `Dispute ${details.disputeId} resolved`,
+      text: tpl.text,
+      html: tpl.html,
+    });
   }
 }

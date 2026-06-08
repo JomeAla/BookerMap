@@ -52,6 +52,10 @@ export class CreateServiceDto {
 
   @IsOptional()
   @IsString()
+  locationId?: string;
+
+  @IsOptional()
+  @IsString()
   categoryId?: string;
 
   @IsOptional()

@@ -13,8 +13,21 @@ import { TableSkeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { DollarSign, TrendingUp, CheckCircle, XCircle, ChevronDown, ChevronUp, Plus, Users } from 'lucide-react'
+import { DollarSign, TrendingUp, CheckCircle, XCircle, ChevronDown, ChevronUp, Plus, Users, RefreshCw, AlertTriangle } from 'lucide-react'
 import type { Settlement, SettlementLineItem, User } from '@/types'
+
+interface ReconciliationResult {
+  provider: string
+  matched: number
+  unmatched: number
+  autoCreated: number
+  totalProviderAmount: number
+  totalLocalAmount: number
+  difference: number
+  startDate: string
+  endDate: string
+  runAt: string
+}
 
 const statusFilters: { value: string; label: string }[] = [
   { value: '', label: 'All' },
@@ -138,6 +151,42 @@ export default function SettlementsPage() {
     onError: (err: any) => addToast(err.response?.data?.message || 'Failed to mark settlement as failed', 'error'),
   })
 
+  const reconcileAllMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post('/settlements/reconcile/all', {})
+      return data.data as { paystack?: ReconciliationResult; flutterwave?: ReconciliationResult }
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['settlements'] })
+      queryClient.invalidateQueries({ queryKey: ['settlements-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['reconciliation-report'] })
+      const parts: string[] = []
+      if (result.paystack) {
+        parts.push(`Paystack: ${result.paystack.matched} matched, ${result.paystack.autoCreated} created`)
+      }
+      if (result.flutterwave) {
+        parts.push(`Flutterwave: ${result.flutterwave.matched} matched, ${result.flutterwave.autoCreated} created`)
+      }
+      addToast(parts.join(' | ') || 'Reconciliation complete', 'success')
+    },
+    onError: (err: any) => addToast(err.response?.data?.message || 'Reconciliation failed', 'error'),
+  })
+
+  const { data: reconciliationData } = useQuery({
+    queryKey: ['reconciliation-report'],
+    queryFn: async () => {
+      const { data } = await api.get('/settlements/reconciliation-report')
+      return data.data as {
+        report: { paystack?: ReconciliationResult; flutterwave?: ReconciliationResult } | null
+        history: ReconciliationResult[]
+      }
+    },
+    refetchInterval: 60000,
+  })
+
+  const reconcileReport = reconciliationData?.report
+  const reconcileHistory = reconciliationData?.history || []
+
   const { data: expandedSettlement } = useQuery({
     queryKey: ['settlement', expandedId],
     queryFn: async () => {
@@ -163,7 +212,16 @@ export default function SettlementsPage() {
             Reconcile provider earnings and track payouts
           </p>
         </div>
-        <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={() => reconcileAllMutation.mutate()}
+            disabled={reconcileAllMutation.isPending}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${reconcileAllMutation.isPending ? 'animate-spin' : ''}`} />
+            {reconcileAllMutation.isPending ? 'Reconciling...' : 'Reconcile Now'}
+          </Button>
+          <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
           <DialogTrigger>
             <Button><Plus className="h-4 w-4 mr-2" /> Generate Settlement</Button>
           </DialogTrigger>
@@ -201,6 +259,7 @@ export default function SettlementsPage() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -224,6 +283,138 @@ export default function SettlementsPage() {
           )
         })}
       </div>
+
+      {(reconcileReport?.paystack || reconcileReport?.flutterwave) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {reconcileReport.paystack && (
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Paystack Reconciliation</h3>
+                  <span className="text-xs text-gray-400">
+                    Last: {formatDate(reconcileReport.paystack.runAt, 'MMM d, yyyy HH:mm')}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">Provider Amount</span>
+                    <p className="font-semibold">{formatCurrency(reconcileReport.paystack.totalProviderAmount)}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Local Amount</span>
+                    <p className="font-semibold">{formatCurrency(reconcileReport.paystack.totalLocalAmount)}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Difference</span>
+                    <p className={`font-bold ${reconcileReport.paystack.difference === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {reconcileReport.paystack.difference === 0 ? (
+                        <span className="flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Matched</span>
+                      ) : (
+                        <span className="flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> {formatCurrency(reconcileReport.paystack.difference)}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Unmatched</span>
+                    <p className="font-semibold">{reconcileReport.paystack.unmatched}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {reconcileReport.flutterwave && (
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Flutterwave Reconciliation</h3>
+                  <span className="text-xs text-gray-400">
+                    Last: {formatDate(reconcileReport.flutterwave.runAt, 'MMM d, yyyy HH:mm')}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">Provider Amount</span>
+                    <p className="font-semibold">{formatCurrency(reconcileReport.flutterwave.totalProviderAmount)}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Local Amount</span>
+                    <p className="font-semibold">{formatCurrency(reconcileReport.flutterwave.totalLocalAmount)}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Difference</span>
+                    <p className={`font-bold ${reconcileReport.flutterwave.difference === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {reconcileReport.flutterwave.difference === 0 ? (
+                        <span className="flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Matched</span>
+                      ) : (
+                        <span className="flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> {formatCurrency(reconcileReport.flutterwave.difference)}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Unmatched</span>
+                    <p className="font-semibold">{reconcileReport.flutterwave.unmatched}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {reconcileHistory.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Reconciliation History</h3>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Provider</TableHead>
+                    <TableHead>Date Range</TableHead>
+                    <TableHead>Run At</TableHead>
+                    <TableHead>Provider Amount</TableHead>
+                    <TableHead>Local Amount</TableHead>
+                    <TableHead>Difference</TableHead>
+                    <TableHead>Matched</TableHead>
+                    <TableHead>Unmatched</TableHead>
+                    <TableHead>Created</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reconcileHistory.map((h, i) => (
+                    <TableRow key={i}>
+                      <TableCell>
+                        <StatusBadge status={h.provider === 'PAYSTACK' ? 'COMPLETED' : 'PROCESSING'} />
+                        <span className="ml-2 text-xs">{h.provider}</span>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {h.startDate} - {h.endDate}
+                      </TableCell>
+                      <TableCell className="text-xs text-gray-500">
+                        {formatDate(h.runAt, 'MMM d, HH:mm')}
+                      </TableCell>
+                      <TableCell className="text-xs font-medium">
+                        {formatCurrency(h.totalProviderAmount)}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {formatCurrency(h.totalLocalAmount)}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`text-xs font-bold ${h.difference === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {h.difference === 0 ? 'Matched' : formatCurrency(h.difference)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs text-green-600">{h.matched}</TableCell>
+                      <TableCell className="text-xs text-red-600">{h.unmatched}</TableCell>
+                      <TableCell className="text-xs text-blue-600">{h.autoCreated}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-4">

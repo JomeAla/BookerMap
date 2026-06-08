@@ -46,8 +46,8 @@ describe('IdempotencyService', () => {
       const result = await service.getCached('test-key');
 
       expect(result).toBeDefined();
-      expect(result.data).toEqual({ id: 'booking-1' });
-      expect(result.statusCode).toBe(200);
+      expect(result!.data).toEqual({ id: 'booking-1' });
+      expect(result!.statusCode).toBe(200);
     });
 
     it('should return null on miss', async () => {
@@ -102,7 +102,7 @@ describe('IdempotencyService', () => {
 
       const result = await service.getCached('test-key');
 
-      expect(result.conflict).toBeUndefined();
+      expect(result!.conflict).toBeUndefined();
     });
   });
 

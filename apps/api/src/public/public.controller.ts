@@ -11,6 +11,13 @@ import { PublicCreateBookingDto } from './dto/public-create-booking.dto';
 export class PublicController {
   constructor(private publicService: PublicService) {}
 
+  @Get('stats')
+  @ApiOperation({ summary: 'Get platform statistics', description: 'Returns public platform statistics (no auth required)' })
+  @ApiResponse({ status: 200, description: 'Platform stats' })
+  getStats() {
+    return this.publicService.getStats();
+  }
+
   @Get('tenants/resolve')
   @ApiOperation({ summary: 'Resolve tenant from custom domain', description: 'Returns tenant info resolved from the Host header (custom domain)' })
   @ApiResponse({ status: 200, description: 'Tenant info' })

@@ -6,6 +6,7 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
@@ -35,6 +36,19 @@ export class TenantController {
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   create(@Body() dto: CreateTenantDto) {
     return this.tenantService.create(dto);
+  }
+
+  @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List all tenants', description: 'Get all tenants (Admin only)' })
+  @ApiResponse({ status: 200, description: 'List of tenants' })
+  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.tenantService.findAll(
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 20,
+    );
   }
 
   @Get('slug/:slug')
@@ -108,5 +122,25 @@ export class TenantController {
   async getDomainConfig(@CurrentUser() user: any) {
     const tenant = await this.tenantService.findById(user.tenantId);
     return this.domainService.getDomainConfig(tenant);
+  }
+
+  @Patch(':id/suspend')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Suspend or activate a tenant', description: 'Toggle tenant active status (Platform Admin only)' })
+  @ApiParam({ name: 'id', type: String })
+  suspend(@Param('id') id: string, @Body('active') active: boolean) {
+    return this.tenantService.toggleActive(id, active);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete a tenant', description: 'Permanently delete a tenant (Platform Admin only)' })
+  @ApiParam({ name: 'id', type: String })
+  remove(@Param('id') id: string) {
+    return this.tenantService.remove(id);
   }
 }

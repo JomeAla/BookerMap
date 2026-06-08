@@ -217,9 +217,25 @@ export class PaymentController {
   @Get('terminals')
   @ApiOperation({ summary: 'List POS terminals', description: 'List available POS terminals from provider' })
   @ApiResponse({ status: 200, description: 'List of terminals' })
-  async listTerminals() {
-    const terminals = await this.paystackService.listTerminals();
+  async listTerminals(@TenantId() tenantId: string) {
+    const terminals = await this.paystackService.listTerminals(tenantId);
     return { success: true, data: terminals };
+  }
+
+  @Get('pos')
+  @ApiOperation({ summary: 'List POS transactions', description: 'List point-of-sale payment transactions' })
+  @ApiResponse({ status: 200, description: 'List of POS payments' })
+  async listPosPayments(@TenantId() tenantId: string) {
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        invoice: { tenantId },
+        providerRef: { startsWith: 'BMR-POS-' },
+      },
+      include: { invoice: { include: { customer: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    return { success: true, data: payments };
   }
 
   @Post('cards')

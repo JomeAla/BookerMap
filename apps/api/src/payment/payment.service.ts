@@ -204,7 +204,7 @@ export class PaymentService {
       return { reference: result.reference, timeout: result.timeout };
     }
 
-    const result = await this.flutterwaveService.initiatePOSCharge(data.amount, 'pos@bookermap.com');
+    const result = await this.flutterwaveService.initiatePOSCharge(data.amount, 'pos@bookermap.com', 'NGN', tenantId);
     return { reference: result.reference, note: result.note };
   }
 
@@ -213,6 +213,6 @@ export class PaymentService {
     if (provider.providerName === 'PAYSTACK') {
       return this.paystackService.checkTerminalStatus(reference, tenantId);
     }
-    return this.flutterwaveService.verifyPOSCharge(reference);
+    return this.flutterwaveService.verifyPOSCharge(reference, tenantId);
   }
 }

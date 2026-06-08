@@ -21,18 +21,19 @@ export class ServiceService {
           ? { create: intakeFields.map((f, i) => ({ ...f, sortOrder: i })) }
           : undefined,
       },
-      include: { modifiers: true, intakeFields: true, category: true },
+      include: { modifiers: true, intakeFields: true, category: true, location: true },
     });
   }
 
-  async findAll(tenantId: string, categoryId?: string) {
+  async findAll(tenantId: string, categoryId?: string, locationId?: string) {
     return this.prisma.service.findMany({
       where: {
         tenantId,
         isActive: true,
         ...(categoryId ? { categoryId } : {}),
+        ...(locationId ? { locationId } : {}),
       },
-      include: { modifiers: true, intakeFields: true, category: true },
+      include: { modifiers: true, intakeFields: true, category: true, location: true },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -40,7 +41,7 @@ export class ServiceService {
   async findById(tenantId: string, id: string) {
     const service = await this.prisma.service.findFirst({
       where: { id, tenantId },
-      include: { modifiers: true, intakeFields: true, category: true },
+      include: { modifiers: true, intakeFields: true, category: true, location: true },
     });
     if (!service) throw new NotFoundException('Service not found');
     return service;
@@ -59,6 +60,7 @@ export class ServiceService {
 
     const updateData: any = { ...data };
     if (categoryId !== undefined) updateData.categoryId = categoryId;
+    if (data.locationId !== undefined) updateData.locationId = data.locationId;
     if (modifiers) updateData.modifiers = { create: modifiers };
     if (intakeFields) {
       updateData.intakeFields = { create: intakeFields.map((f, i) => ({ ...f, sortOrder: i })) };
@@ -67,7 +69,7 @@ export class ServiceService {
     return this.prisma.service.update({
       where: { id },
       data: updateData,
-      include: { modifiers: true, intakeFields: true, category: true },
+      include: { modifiers: true, intakeFields: true, category: true, location: true },
     });
   }
 
@@ -81,7 +83,7 @@ export class ServiceService {
     return this.prisma.service.update({
       where: { id },
       data: { imageUrl },
-      include: { modifiers: true, intakeFields: true, category: true },
+      include: { modifiers: true, intakeFields: true, category: true, location: true },
     });
   }
 

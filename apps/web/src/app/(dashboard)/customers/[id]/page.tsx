@@ -24,6 +24,8 @@ export default function CustomerDetailPage() {
   const { addToast } = useToast()
   const [editingTags, setEditingTags] = React.useState(false)
   const [tagInput, setTagInput] = React.useState('')
+  const [editOpen, setEditOpen] = React.useState(false)
+  const [editForm, setEditForm] = React.useState({ firstName: '', lastName: '', email: '', phone: '', notes: '' })
 
   const { data: customer, isLoading } = useQuery({
     queryKey: ['customer', id],
@@ -54,6 +56,19 @@ export default function CustomerDetailPage() {
       return data.data as SavedCard[]
     },
     enabled: !!id,
+  })
+
+  const updateCustomerMutation = useMutation({
+    mutationFn: async (data: { firstName?: string; lastName?: string; email?: string; phone?: string; notes?: string }) => {
+      const { data: result } = await api.patch(`/customers/${id}`, data)
+      return result
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer', id] })
+      setEditOpen(false)
+      addToast('Customer updated', 'success')
+    },
+    onError: () => addToast('Failed to update customer', 'error'),
   })
 
   const deleteCardMutation = useMutation({
@@ -89,7 +104,25 @@ export default function CustomerDetailPage() {
         <Link href="/customers" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to Customers
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{name}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{name}</h1>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setEditForm({
+                firstName: customer.firstName || '',
+                lastName: customer.lastName || '',
+                email: customer.email || '',
+                phone: customer.phone || '',
+                notes: customer.notes || '',
+              })
+              setEditOpen(true)
+            }}
+          >
+            <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -279,6 +312,71 @@ export default function CustomerDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Customer</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
+                <Input
+                  value={editForm.firstName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
+                <Input
+                  value={editForm.lastName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+              <Input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
+              <Input
+                value={editForm.phone}
+                onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
+              <Input
+                value={editForm.notes}
+                onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  const payload: Record<string, string> = {}
+                  if (editForm.firstName !== (customer.firstName || '')) payload.firstName = editForm.firstName
+                  if (editForm.lastName !== (customer.lastName || '')) payload.lastName = editForm.lastName
+                  if (editForm.email !== (customer.email || '')) payload.email = editForm.email
+                  if (editForm.phone !== (customer.phone || '')) payload.phone = editForm.phone
+                  if (editForm.notes !== (customer.notes || '')) payload.notes = editForm.notes
+                  updateCustomerMutation.mutate(payload)
+                }}
+                disabled={updateCustomerMutation.isPending}
+              >
+                {updateCustomerMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -8,6 +8,19 @@ import { BookingGateway } from '../gateway/booking.gateway';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { RescheduleBookingDto } from './dto/reschedule-booking.dto';
 
+type TimeBlock = { start: string; end: string };
+type Availability = Record<string, TimeBlock[]> | null;
+
+function isTechnicianAvailable(availability: Availability, dateTime: Date): boolean {
+  if (!availability) return true;
+  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const dayName = days[dateTime.getDay()];
+  const slots = availability[dayName];
+  if (!slots || slots.length === 0) return false;
+  const time = `${dateTime.getHours().toString().padStart(2, '0')}:${dateTime.getMinutes().toString().padStart(2, '0')}`;
+  return slots.some(s => time >= s.start && time <= s.end);
+}
+
 @Injectable()
 export class BookingService {
   private readonly logger = new Logger(BookingService.name);
@@ -41,6 +54,14 @@ export class BookingService {
     if (technicianId) {
       const hasConflict = await this.schedulingService.checkConflicts(technicianId, start, end);
       if (hasConflict) throw new BadRequestException('Time slot conflicts with an existing booking');
+
+      const technician = await this.prisma.user.findFirst({
+        where: { id: technicianId, tenantId },
+      });
+      if (!technician) throw new NotFoundException('Technician not found');
+      if (!isTechnicianAvailable(technician.availability as Availability, start)) {
+        throw new BadRequestException('Technician is not available at the requested time');
+      }
     }
 
     let totalPrice = service.price;

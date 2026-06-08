@@ -133,6 +133,8 @@ export interface Service {
   createdAt: string
   updatedAt: string
   tenantId: string
+  locationId?: string | null
+  location?: Location | null
   categoryId?: string | null
   category?: ServiceCategory | null
   modifiers?: ServiceModifier[]
@@ -421,9 +423,10 @@ export interface SavedCard {
 }
 
 export interface Terminal {
-  terminalId: string
+  id: string
   name: string
   status: string
+  lastSeen?: string
 }
 
 export interface InventoryItem {
@@ -590,6 +593,8 @@ export interface SatisfactionSurvey {
   scoreType: ScoreType
   feedback?: string | null
   category?: SatisfactionCategory | null
+  sentimentScore?: number | null
+  sentimentLabel?: string | null
   respondedAt: string
   createdAt: string
 }
@@ -636,6 +641,42 @@ export interface FeedbackByCategory {
 export interface CustomerSatisfaction {
   surveys: SatisfactionSurvey[]
   npsResponses: NPSResponse[]
+}
+
+export type SentimentLabel = 'positive' | 'neutral' | 'negative'
+
+export interface SentimentTrendPoint {
+  date: string
+  score: number
+}
+
+export interface SentimentTrendResult {
+  positivePct: number
+  neutralPct: number
+  negativePct: number
+  total: number
+  trend: SentimentTrendPoint[]
+}
+
+export interface SentimentCategoryResult {
+  category: string
+  positiveCount: number
+  neutralCount: number
+  negativeCount: number
+  averageScore: number
+  total: number
+}
+
+export interface TopKeywordsResult {
+  keyword: string
+  count: number
+}
+
+export interface SentimentResult {
+  score: number
+  label: SentimentLabel
+  keywords: string[]
+  confidence: number
 }
 
 export interface ConversationFlow {

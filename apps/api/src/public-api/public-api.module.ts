@@ -7,9 +7,10 @@ import { ApiThrottleGuard } from './guards/api-throttle.guard';
 import { BookingModule } from '../booking/booking.module';
 import { CustomerModule } from '../customer/customer.module';
 import { ServiceModule } from '../service/service.module';
+import { TerritoryModule } from '../territory/territory.module';
 
 @Module({
-  imports: [BookingModule, CustomerModule, ServiceModule],
+  imports: [BookingModule, CustomerModule, ServiceModule, TerritoryModule],
   controllers: [PublicApiController, ApiKeyController],
   providers: [ApiKeyService, ApiKeyGuard, ApiThrottleGuard],
   exports: [ApiKeyService],

@@ -14,6 +14,7 @@ import { Wrench, MapPin, Clock, User, CheckCircle, Play, XCircle, Navigation, Cr
 import { type Dispatch, type Booking, JobStatus, type LocationUpdate } from '@/types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useLocationSocket } from '@/components/providers/socket-provider'
+import { useAuth } from '@/hooks/useAuth'
 
 const statusActions: { status: JobStatus; label: string; icon: React.ReactNode; variant?: 'default' | 'outline' | 'destructive' }[] = [
   { status: JobStatus.EN_ROUTE, label: 'En Route', icon: <Navigation className="h-4 w-4" /> },
@@ -27,6 +28,7 @@ function TechnicianContent() {
   const { addToast } = useToast()
   const locationSocketRef = useLocationSocket()
 
+  const { user } = useAuth()
   const [sharingBookingId, setSharingBookingId] = React.useState<string | null>(null)
   const [locationError, setLocationError] = React.useState<string | null>(null)
   const watchIdRef = React.useRef<number | null>(null)
@@ -65,12 +67,12 @@ function TechnicianContent() {
             speed: speed ?? undefined,
             heading: heading ?? undefined,
             bookingId,
-            userId: 'current',
+            userId: user?.id || '',
             tenantId: tenantId || '',
           })
         } else {
           api.post('/locations/update', {
-            userId: 'current',
+            userId: user?.id || '',
             bookingId,
             latitude,
             longitude,
@@ -107,6 +109,21 @@ function TechnicianContent() {
       })
       return data.data as (Dispatch & { booking: Booking })[]
     },
+  })
+
+  const acceptMutation = useMutation({
+    mutationFn: async ({ dispatchId }: { dispatchId: string }) => {
+      const { data } = await api.post(`/dispatches/${dispatchId}/accept`, {
+        technicianId: user?.id || '',
+      })
+      return data.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['technician-available-jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['technician-today-jobs'] })
+      addToast('Job accepted successfully', 'success')
+    },
+    onError: () => addToast('Failed to accept job', 'error'),
   })
 
   const updateMutation = useMutation({
@@ -293,13 +310,8 @@ function TechnicianContent() {
                             key={dispatch.id}
                             size="sm"
                             variant="outline"
-                            onClick={() => {
-                              // This would call the accept job endpoint
-                              // For now, we'll just show a toast
-                              addToast(`Accepted job for ${booking?.service?.name}`, 'success')
-                              queryClient.invalidateQueries({ queryKey: ['technician-available-jobs'] })
-                            }}
-                            disabled={updateMutation.isPending}
+                            onClick={() => acceptMutation.mutate({ dispatchId: dispatch.id })}
+                            disabled={acceptMutation.isPending}
                           >
                             <CheckCircle className="h-4 w-4 mr-2" />
                             Accept Job

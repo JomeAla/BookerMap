@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateWebhookDto } from './dto/create-webhook.dto';
 import { UpdateWebhookDto } from './dto/update-webhook.dto';
+import { WebhookDeliveryService } from './webhook-delivery.service';
 import * as crypto from 'crypto';
 
 export const WEBHOOK_EVENTS = [
@@ -27,7 +28,10 @@ export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 export class WebhookService {
   private readonly logger = new Logger(WebhookService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private deliveryService: WebhookDeliveryService,
+  ) {}
 
   async registerWebhook(tenantId: string, dto: CreateWebhookDto) {
     return this.prisma.webhook.create({
@@ -94,11 +98,17 @@ export class WebhookService {
     const body = JSON.stringify({ event, timestamp: new Date().toISOString(), data: payload });
 
     for (const webhook of webhooks) {
-      this.dispatchToWebhook(webhook, event, body);
+      const delivery = await this.deliveryService.createDelivery(webhook.id, tenantId, event, payload);
+      this.dispatchToWebhook(webhook, event, body, delivery.id);
     }
   }
 
-  private async dispatchToWebhook(webhook: { id: string; url: string; secret: string | null }, event: string, body: string): Promise<void> {
+  private async dispatchToWebhook(
+    webhook: { id: string; url: string; secret: string | null },
+    event: string,
+    body: string,
+    deliveryId: string,
+  ): Promise<void> {
     const signature = this.generateSignature(body, webhook.secret || '');
 
     try {
@@ -111,15 +121,20 @@ export class WebhookService {
           'User-Agent': 'BookerMap-Webhook/1.0',
         },
         body,
+        signal: AbortSignal.timeout(10000),
       });
 
       if (response.ok) {
         this.logger.log(`Webhook ${webhook.id} dispatched to ${webhook.url} (${response.status})`);
+        await this.deliveryService.markSuccess(deliveryId, response.status);
       } else {
         this.logger.warn(`Webhook ${webhook.id} returned ${response.status} from ${webhook.url}`);
+        await this.deliveryService.markFailed(deliveryId, `HTTP ${response.status}`, response.status);
       }
     } catch (error) {
-      this.logger.error(`Webhook ${webhook.id} failed for ${webhook.url}: ${error instanceof Error ? error.message : error}`);
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Webhook ${webhook.id} failed for ${webhook.url}: ${msg}`);
+      await this.deliveryService.markFailed(deliveryId, msg);
     }
   }
 

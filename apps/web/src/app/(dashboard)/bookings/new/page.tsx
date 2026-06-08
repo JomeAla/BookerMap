@@ -56,9 +56,11 @@ export default function NewBookingPage() {
   })
 
   const { data: services } = useQuery({
-    queryKey: ['services-for-booking'],
+    queryKey: ['services-for-booking', form.locationId],
     queryFn: async () => {
-      const { data } = await api.get('/services')
+      const params: Record<string, string> = {}
+      if (form.locationId) params.locationId = form.locationId
+      const { data } = await api.get('/services', { params })
       return data.data as Service[]
     },
   })

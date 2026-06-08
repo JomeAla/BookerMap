@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsObject } from 'class-validator';
+import { IsOptional, IsString, IsObject, IsInt, Min, Max, MaxLength } from 'class-validator';
 
 export class ChatMessageDto {
   @IsOptional()
@@ -32,6 +32,7 @@ export class ChatResponse {
   intent!: string;
   entities!: EntityMap;
   conversationId!: string;
+  messageId?: string;
   action?: string;
   quickReplies?: string[];
   paymentAction?: PaymentAction;
@@ -68,4 +69,16 @@ export class CreateResponseDto {
   @IsOptional()
   @IsString()
   language?: string;
+}
+
+export class RateMessageDto {
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  rating!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  feedback?: string;
 }

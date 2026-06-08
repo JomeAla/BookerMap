@@ -9,7 +9,8 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { StatusBadge } from '@/components/ui/badge'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { formatDate } from '@/lib/utils'
-import { Truck, MapPin, Clock, Route, ChevronRight, Navigation, CheckCircle2, X } from 'lucide-react'
+import Link from 'next/link'
+import { Truck, MapPin, Clock, Route, ChevronRight, Navigation, CheckCircle2, X, Globe } from 'lucide-react'
 import type { Dispatch } from '@/types'
 
 interface RouteResult {
@@ -101,6 +102,11 @@ export default function DispatchesPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dispatches</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage technician dispatches and optimize routes</p>
         </div>
+        <Link href="/dispatches/tracking">
+          <Button variant="outline">
+            <Globe className="h-4 w-4 mr-1.5" /> Live Map
+          </Button>
+        </Link>
       </div>
 
       {routeResult && (

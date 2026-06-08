@@ -212,6 +212,20 @@ export class AuthService {
       return { ...user, ...tokens };
     }
 
+    const slugBase = (data.firstName + data.lastName).toLowerCase().replace(/[^a-z0-9]/g, '') || data.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+    let slug = slugBase;
+    let suffix = 1;
+    while (await this.prisma.tenant.findUnique({ where: { slug } })) {
+      slug = `${slugBase}${suffix++}`;
+    }
+
+    const tenant = await this.prisma.tenant.create({
+      data: {
+        name: `${data.firstName}'s Business`,
+        slug,
+      },
+    });
+
     user = await this.prisma.user.create({
       data: {
         email: data.email,
@@ -220,7 +234,7 @@ export class AuthService {
         role: 'OWNER' as any,
         passwordHash: '',
         emailVerified: true,
-        tenantId: '',
+        tenantId: tenant.id,
       },
     });
 

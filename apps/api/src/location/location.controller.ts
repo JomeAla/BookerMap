@@ -33,6 +33,22 @@ export class LocationController {
     return this.locationService.findAll(tenantId);
   }
 
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER, UserRole.TECHNICIAN)
+  @Get('latest/:userId')
+  @ApiOperation({ summary: 'Get latest location for a user', description: 'Returns the most recent location update for a technician' })
+  @ApiResponse({ status: 200, description: 'Latest location' })
+  getLatestLocation(@Param('userId') userId: string) {
+    return this.locationService.getLatestLocation(userId);
+  }
+
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER, UserRole.TECHNICIAN)
+  @Get('history/:bookingId')
+  @ApiOperation({ summary: 'Get location history for a booking', description: 'Returns all location points for a booking' })
+  @ApiResponse({ status: 200, description: 'Location history' })
+  getLocationHistory(@Param('bookingId') bookingId: string) {
+    return this.locationService.getLocationHistory(bookingId);
+  }
+
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Get(':id')
   @ApiOperation({ summary: 'Get location by ID' })
@@ -69,21 +85,5 @@ export class LocationController {
   @ApiResponse({ status: 201, description: 'Location update saved' })
   saveLocationUpdate(@TenantId() tenantId: string, @Body() dto: CreateLocationUpdateDto) {
     return this.locationService.saveLocation(tenantId, dto);
-  }
-
-  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER, UserRole.TECHNICIAN)
-  @Get('latest/:userId')
-  @ApiOperation({ summary: 'Get latest location for a user', description: 'Returns the most recent location update for a technician' })
-  @ApiResponse({ status: 200, description: 'Latest location' })
-  getLatestLocation(@Param('userId') userId: string) {
-    return this.locationService.getLatestLocation(userId);
-  }
-
-  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER, UserRole.TECHNICIAN)
-  @Get('history/:bookingId')
-  @ApiOperation({ summary: 'Get location history for a booking', description: 'Returns all location points for a booking' })
-  @ApiResponse({ status: 200, description: 'Location history' })
-  getLocationHistory(@Param('bookingId') bookingId: string) {
-    return this.locationService.getLocationHistory(bookingId);
   }
 }

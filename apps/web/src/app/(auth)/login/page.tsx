@@ -1,134 +1,116 @@
 'use client'
 
-import * as React from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
-import { Spinner } from '@/components/ui/spinner'
-import { api } from '@/lib/api'
-import { setToken, setUser } from '@/lib/auth'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'
+import { motion } from 'framer-motion'
+import { Eye, EyeOff, ArrowLeft, LogIn } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = React.useState('')
-  const [password, setPassword] = React.useState('')
-  const [error, setError] = React.useState('')
-  const [loading, setLoading] = React.useState(false)
+  const { login } = useAuth()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [showPass, setShowPass] = useState(false)
+  const [form, setForm] = useState({ email: '', password: '' })
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+    e.preventDefault(); setError(''); setLoading(true)
     try {
-      const res = await api.post('/auth/login', { email, password })
-      const payload = res.data.data
-
-      if (payload.twoFactorRequired) {
-        router.push(`/auth/2fa?userId=${payload.userId}`)
-        return
-      }
-
-      setToken(payload.accessToken)
-      setUser(payload.user)
+      const r = await login(form.email, form.password)
+      if (r?.twoFactorRequired) { router.push(`/auth/2fa?userId=${r.userId}`); return }
       router.push('/dashboard')
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid email or password')
-    } finally {
-      setLoading(false)
-    }
+      setError(err?.response?.data?.message || err.message || 'Invalid credentials')
+    } finally { setLoading(false) }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 h-10 w-10 rounded-lg bg-blue-600 flex items-center justify-center">
-            <span className="text-white font-bold text-lg">B</span>
+    <div className="min-h-screen bg-surface flex">
+      {/* Left brand panel — white bg, black text */}
+      <div className="hidden lg:flex lg:w-[42%] bg-white relative overflow-hidden border-r border-border">
+        <div className="relative flex flex-col justify-center px-12 w-full">
+          <Link href="/" className="text-text-muted hover:text-text text-sm inline-flex items-center gap-1.5 mb-12 transition-colors">
+            <ArrowLeft className="h-4 w-4" /> Back to Home
+          </Link>
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.2 }}>
+            <h2 className="text-3xl font-bold text-text leading-tight">Smart booking for home services</h2>
+            <p className="mt-3 text-text-secondary leading-relaxed">Manage bookings, dispatch technicians, and process payments — all from one powerful platform.</p>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.5 }}
+            className="mt-12 p-5 rounded-xl bg-accent-subtle/30 border border-accent/10">
+            <p className="text-text-secondary text-sm italic leading-relaxed">&ldquo;BookerMap cut our payment collection time from weeks to hours. Best decision we made for our electrical business.&rdquo;</p>
+            <p className="mt-3 text-text-muted text-xs">Brian M., Nairobi Electric</p>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Right form panel — accent green bg */}
+      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-gradient-to-br from-accent-dark via-accent to-accent-light">
+        <motion.div className="w-full max-w-md" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <div className="lg:hidden mb-8">
+            <Link href="/" className="text-white/70 hover:text-white text-sm inline-flex items-center gap-1.5 transition-colors">
+              <ArrowLeft className="h-4 w-4" /> Back
+            </Link>
           </div>
-          <CardTitle className="text-xl">Welcome back</CardTitle>
-          <CardDescription>Sign in to your BookerMap account</CardDescription>
-        </CardHeader>
-        <CardContent>
+
+          <div className="mb-7">
+            <h1 className="text-2xl font-bold text-white">Welcome back</h1>
+            <p className="mt-1 text-white/70 text-sm">Sign in to your BookerMap account</p>
+          </div>
+
+          {error && (
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+              className="mb-5 p-3 rounded-lg bg-red-500/20 border border-red-400/30 text-white text-sm">
+              {error}
+            </motion.div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-600 dark:text-red-400">
-                {error}
+            <div>
+              <label className="block text-sm font-medium text-white mb-1.5">Email</label>
+              <input
+                type="email" required
+                className="w-full px-3.5 py-2.5 rounded-lg bg-white/15 border border-white/20 text-white placeholder:text-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white/40 transition-all"
+                placeholder="you@example.com"
+                value={form.email}
+                onChange={e => setForm({ ...form, email: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-white mb-1.5">Password</label>
+              <div className="relative">
+                <input
+                  type={showPass ? 'text' : 'password'} required
+                  className="w-full px-3.5 py-2.5 rounded-lg bg-white/15 border border-white/20 text-white placeholder:text-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white/40 transition-all pr-10"
+                  placeholder="Your password"
+                  value={form.password}
+                  onChange={e => setForm({ ...form, password: e.target.value })}
+                />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white transition-colors"
+                  onClick={() => setShowPass(!showPass)}>
+                  {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
-            )}
-            <Input
-              label="Email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <Input
-              label="Password"
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            </div>
             <div className="flex items-center justify-end">
-              <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
+              <Link href="/forgot-password" className="text-sm text-white/80 hover:text-white font-medium transition-colors">
                 Forgot password?
               </Link>
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? <Spinner size="sm" /> : 'Sign in'}
-            </Button>
+            <button type="submit" disabled={loading}
+              className="w-full py-2.5 rounded-lg font-semibold text-sm text-accent bg-white hover:bg-accent-subtle transition-all duration-300 disabled:opacity-50 inline-flex items-center justify-center gap-2 shadow-md">
+              {loading ? 'Signing in...' : (<><LogIn className="h-4 w-4" /> Sign In</>)}
+            </button>
           </form>
 
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200 dark:border-gray-800" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white dark:bg-gray-950 px-2 text-gray-500">Or continue with</span>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <a
-              href={`${API_URL}/auth/google`}
-              className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
-            >
-              <svg className="h-5 w-5" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-              </svg>
-              Sign in with Google
-            </a>
-            <a
-              href={`${API_URL}/auth/microsoft`}
-              className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
-            >
-              <svg className="h-5 w-5" viewBox="0 0 23 23">
-                <rect x="1" y="1" width="10" height="10" fill="#F25022"/>
-                <rect x="12" y="1" width="10" height="10" fill="#7FBA00"/>
-                <rect x="1" y="12" width="10" height="10" fill="#00A4EF"/>
-                <rect x="12" y="12" width="10" height="10" fill="#FFB900"/>
-              </svg>
-              Sign in with Microsoft
-            </a>
-          </div>
-
-          <p className="mt-6 text-center text-sm text-gray-500">
+          <p className="mt-6 text-center text-sm text-white/70">
             Don&apos;t have an account?{' '}
-            <Link href="/register" className="text-blue-600 hover:underline font-medium">
-              Sign up
-            </Link>
+            <Link href="/register" className="text-white hover:underline font-medium transition-colors">Sign up</Link>
           </p>
-        </CardContent>
-      </Card>
+        </motion.div>
+      </div>
     </div>
   )
 }

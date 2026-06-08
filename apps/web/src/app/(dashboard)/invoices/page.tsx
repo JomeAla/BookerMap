@@ -39,6 +39,10 @@ export default function InvoicesPage() {
   const queryClient = useQueryClient()
   const { addToast } = useToast()
   const [statusFilter, setStatusFilter] = React.useState('')
+  const [page, setPage] = React.useState(1)
+  const limit = 20
+
+  React.useEffect(() => { setPage(1) }, [statusFilter])
   const [dialogOpen, setDialogOpen] = React.useState(false)
 
   const [form, setForm] = React.useState({
@@ -53,15 +57,22 @@ export default function InvoicesPage() {
     { description: '', quantity: 1, unitPrice: 0 },
   ])
 
-  const { data: invoices, isLoading } = useQuery({
-    queryKey: ['invoices', statusFilter],
+  const { data: invoicesData, isLoading } = useQuery({
+    queryKey: ['invoices', statusFilter, page],
     queryFn: async () => {
-      const params: Record<string, string> = {}
+      const params: Record<string, string> = { page: String(page), limit: String(limit) }
       if (statusFilter) params.status = statusFilter
       const { data } = await api.get('/invoices', { params })
-      return data.data as Invoice[]
+      return { items: data.data as Invoice[], meta: data.meta as { total: number; page: number; limit: number; totalPages: number } }
     },
   })
+
+  const invoices = invoicesData?.items
+  const meta = invoicesData?.meta
+  const totalPages = meta?.totalPages ?? 1
+  const total = meta?.total ?? 0
+  const start = total === 0 ? 0 : (page - 1) * limit + 1
+  const end = Math.min(page * limit, total)
 
   const { data: customers } = useQuery({
     queryKey: ['customers-dropdown'],
@@ -311,6 +322,33 @@ export default function InvoicesPage() {
           )}
         </CardContent>
       </Card>
+
+      {invoices && invoices.length > 0 && (
+        <div className="flex items-center justify-between px-1">
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            Showing {start}\u2013{end} of {total}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-gray-800 transition-colors"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= totalPages}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-gray-800 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

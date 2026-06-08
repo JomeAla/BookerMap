@@ -2,11 +2,13 @@ import {
   Controller, Get, Post, Param, Body, Query, UseGuards, Logger,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BookingService } from '../booking/booking.service';
 import { SchedulingService } from '../booking/scheduling.service';
 import { CustomerService } from '../customer/customer.service';
 import { ServiceService } from '../service/service.service';
+import { TerritoryService } from '../territory/territory.service';
 import { ApiKeyGuard } from './guards/api-key.guard';
 import { ApiThrottleGuard } from './guards/api-throttle.guard';
 import { Scopes } from './decorators/scopes.decorator';
@@ -27,6 +29,7 @@ export class PublicApiController {
     private schedulingService: SchedulingService,
     private customerService: CustomerService,
     private serviceService: ServiceService,
+    private territoryService: TerritoryService,
   ) {}
 
   @Get('bookings')
@@ -106,9 +109,27 @@ export class PublicApiController {
   @Get('services')
   @Scopes('read:services')
   @ApiOperation({ summary: 'List services', description: 'Returns all active services for the tenant' })
-  async listServices(@ApiKeyContext() ctx: { tenantId: string }) {
-    const services = await this.serviceService.findAll(ctx.tenantId);
+  @ApiQuery({ name: 'categoryId', required: false, type: String })
+  @ApiQuery({ name: 'locationId', required: false, type: String })
+  async listServices(
+    @ApiKeyContext() ctx: { tenantId: string },
+    @Query('categoryId') categoryId?: string,
+    @Query('locationId') locationId?: string,
+  ) {
+    const services = await this.serviceService.findAll(ctx.tenantId, categoryId, locationId);
     return { data: services };
+  }
+
+  @Get('services/:id')
+  @Scopes('read:services')
+  @ApiOperation({ summary: 'Get service', description: 'Returns a single service with modifiers and intake fields' })
+  @ApiParam({ name: 'id', type: String })
+  async getService(
+    @ApiKeyContext() ctx: { tenantId: string },
+    @Param('id') id: string,
+  ) {
+    const service = await this.serviceService.findById(ctx.tenantId, id);
+    return { data: service };
   }
 
   @Get('customers')
@@ -151,15 +172,59 @@ export class PublicApiController {
 
   @Get('availability')
   @Scopes('read:availability')
-  @ApiOperation({ summary: 'Check availability', description: 'Returns available time slots for a service and date' })
+  @ApiOperation({ summary: 'Check availability', description: 'Returns available time slots for a service and date, optionally filtered by technician' })
   @ApiQuery({ name: 'serviceId', required: true, type: String })
-  @ApiQuery({ name: 'date', required: true, type: String })
+  @ApiQuery({ name: 'date', required: false, type: String, description: 'Date in YYYY-MM-DD format, defaults to today' })
+  @ApiQuery({ name: 'technicianId', required: false, type: String, description: 'Filter by technician' })
   async checkAvailability(
     @ApiKeyContext() ctx: { tenantId: string },
     @Query('serviceId') serviceId: string,
-    @Query('date') date: string,
+    @Query('date') date?: string,
+    @Query('technicianId') technicianId?: string,
   ) {
-    const slots = await this.schedulingService.getAvailableSlots(serviceId, date, ctx.tenantId);
-    return { data: slots };
+    const d = date || new Date().toISOString().split('T')[0];
+    const slots = await this.schedulingService.getAvailableSlots(serviceId, d, ctx.tenantId);
+    const filtered = technicianId ? slots.filter((s: any) => s.technicianId === technicianId) : slots;
+    return { data: filtered };
+  }
+
+  @Get('territories')
+  @Scopes('read:territories')
+  @ApiOperation({ summary: 'List territories', description: 'Returns all active territories for the tenant' })
+  async listTerritories(@ApiKeyContext() ctx: { tenantId: string }) {
+    const territories = await this.territoryService.findAll(ctx.tenantId);
+    return { data: territories };
+  }
+
+  @Get('technicians')
+  @Scopes('read:technicians')
+  @ApiOperation({ summary: 'List technicians', description: 'Returns all active technicians for the tenant' })
+  async listTechnicians(@ApiKeyContext() ctx: { tenantId: string }) {
+    const technicians = await this.prisma.user.findMany({
+      where: { tenantId: ctx.tenantId, role: UserRole.TECHNICIAN, isActive: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        skills: true,
+        availability: true,
+      },
+      orderBy: { firstName: 'asc' },
+    });
+    return { data: technicians };
+  }
+
+  @Get('customers/:id')
+  @Scopes('read:customers')
+  @ApiOperation({ summary: 'Get customer', description: 'Returns a single customer by ID' })
+  @ApiParam({ name: 'id', type: String })
+  async getCustomer(
+    @ApiKeyContext() ctx: { tenantId: string },
+    @Param('id') id: string,
+  ) {
+    const customer = await this.customerService.findById(ctx.tenantId, id);
+    return { data: customer };
   }
 }

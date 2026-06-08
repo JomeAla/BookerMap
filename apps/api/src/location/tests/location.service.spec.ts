@@ -103,7 +103,7 @@ describe('LocationService', () => {
       const result = await service.getLatestLocation('tech-1');
 
       expect(result).toBeDefined();
-      expect(result.userId).toBe('tech-1');
+      expect(result!.userId).toBe('tech-1');
       expect(mockPrisma.locationUpdate.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { userId: 'tech-1' },

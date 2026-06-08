@@ -1,124 +1,204 @@
 'use client'
 
 import * as React from 'react'
-import { usePathname } from 'next/navigation'
-import { Bell, ChevronDown } from 'lucide-react'
-import { useAuth } from '@/hooks/useAuth'
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import { useQuery } from '@tanstack/react-query'
-import { getUnreadCount } from '@/lib/notifications'
-import { NotificationPanel } from '@/components/notifications/notification-panel'
+import {
+  Search,
+  Bell,
+  ChevronDown,
+  LogOut,
+  Settings,
+  User as UserIcon,
+  Menu,
+  X,
+} from 'lucide-react'
 
-const breadcrumbMap: Record<string, string> = {
-  dashboard: 'Dashboard',
-  bookings: 'Bookings',
-  customers: 'Customers',
-  services: 'Services',
-  calendar: 'Calendar',
-  invoices: 'Invoices',
-  notifications: 'Notifications',
-  reports: 'Reports',
-  settings: 'Settings',
-  payments: 'Payments',
-  ai: 'AI Agent',
-  team: 'Team',
+const pageTitles: Record<string, string> = {
+  '/dashboard': 'Dashboard',
+  '/calendar': 'Calendar',
+  '/bookings': 'Bookings',
+  '/customers': 'Customers',
+  '/services': 'Services',
+  '/dispatches': 'Dispatches',
+  '/invoices': 'Invoices',
+  '/inventory': 'Inventory',
+  '/marketing': 'Marketing',
+  '/disputes': 'Disputes',
+  '/reviews': 'Reviews',
+  '/satisfaction': 'Satisfaction',
+  '/reports': 'Reports',
+  '/notifications': 'Notifications',
+  '/settings': 'Settings',
+  '/split-payments': 'Split Payments',
+  '/settlements': 'Settlements',
 }
 
-export function Header() {
+interface HeaderProps {
+  onMenuClick: () => void
+  isSidebarOpen: boolean
+}
+
+export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
   const pathname = usePathname()
-  const { user, logout } = useAuth()
-  const [dropdownOpen, setDropdownOpen] = React.useState(false)
-  const [notifOpen, setNotifOpen] = React.useState(false)
-  const dropdownRef = React.useRef<HTMLDivElement>(null)
-  const notifRef = React.useRef<HTMLDivElement>(null)
+  const router = useRouter()
+  const [userMenuOpen, setUserMenuOpen] = React.useState(false)
+  const [notificationsOpen, setNotificationsOpen] = React.useState(false)
+  const menuRef = React.useRef<HTMLDivElement>(null)
 
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: ['notifications-unread'],
-    queryFn: getUnreadCount,
-    refetchInterval: 30000,
-  })
+  const currentPage = pageTitles[pathname] || pathname.split('/').pop()?.replace(/-/g, ' ') || 'Dashboard'
 
-  const segments = pathname.split('/').filter(Boolean)
-  const breadcrumbs = segments.map((seg: string, i: number) => ({
-    label: breadcrumbMap[seg] || seg.charAt(0).toUpperCase() + seg.slice(1),
-    href: '/' + segments.slice(0, i + 1).join('/'),
-  }))
+  const user = React.useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('bm_user') || '{}')
+    } catch {
+      return {}
+    }
+  }, [])
+
+  const unreadCount = React.useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('bm_unread') || '0')
+    } catch {
+      return 0
+    }
+  }, [])
 
   React.useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false)
-      }
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-        setNotifOpen(false)
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false)
+        setNotificationsOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-6">
-      <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-        {breadcrumbs.map((crumb: { label: string; href: string }, i: number) => (
-          <React.Fragment key={crumb.href}>
-            {i > 0 && <span>/</span>}
-            <span className={cn(i === breadcrumbs.length - 1 && 'text-gray-900 dark:text-white font-medium')}>
-              {crumb.label}
-            </span>
-          </React.Fragment>
-        ))}
-      </nav>
+  const handleLogout = () => {
+    localStorage.removeItem('bm_token')
+    localStorage.removeItem('bm_user')
+    localStorage.removeItem('bm_refresh')
+    router.push('/login')
+  }
 
-      <div className="ml-auto flex items-center gap-3">
-        <div className="relative" ref={notifRef}>
+  const initials = user.firstName && user.lastName
+    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+    : 'U'
+
+  return (
+    <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 lg:px-6 bg-surface/80 backdrop-blur-xl border-b border-border">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuClick}
+          className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-surface-secondary transition-colors"
+          aria-label="Toggle menu"
+        >
+          {isSidebarOpen ? <X className="h-5 w-5 text-text-primary" /> : <Menu className="h-5 w-5 text-text-primary" />}
+        </button>
+        <div>
+          <h1 className="text-lg font-semibold text-text-primary tracking-tight capitalize">
+            {currentPage}
+          </h1>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2" ref={menuRef}>
+        <button className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-sm text-text-muted bg-surface-secondary rounded-lg border border-border hover:border-accent/30 hover:text-text-secondary transition-colors w-48">
+          <Search className="h-4 w-4" />
+          <span>Search...</span>
+          <kbd className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-border/50 text-text-muted">
+            Ctrl+K
+          </kbd>
+        </button>
+
+        <div className="relative">
           <button
-            onClick={() => setNotifOpen(!notifOpen)}
-            className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            onClick={() => setNotificationsOpen(!notificationsOpen)}
+            className="relative p-2 rounded-lg hover:bg-surface-secondary transition-colors"
           >
-            <Bell className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            <Bell className="h-5 w-5 text-text-secondary" />
             {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] rounded-full bg-red-500 text-white text-[10px] font-medium flex items-center justify-center px-1">
-                {unreadCount > 99 ? '99+' : unreadCount}
+              <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] px-1 flex items-center justify-center rounded-full bg-accent text-white text-[10px] font-bold">
+                {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </button>
-          {notifOpen && <NotificationPanel onClose={() => setNotifOpen(false)} />}
+
+          <AnimatePresence>
+            {notificationsOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                className="absolute right-0 mt-2 w-80 bg-surface rounded-xl border border-border shadow-lg shadow-slate-900/5 p-4"
+              >
+                <p className="text-sm font-medium text-text-primary mb-3">Notifications</p>
+                <div className="text-center py-6">
+                  <Bell className="h-8 w-8 mx-auto mb-2 text-text-muted/50" />
+                  <p className="text-sm text-text-secondary">No new notifications</p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        <div className="relative" ref={dropdownRef}>
+        <div className="relative">
           <button
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center gap-2 rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
+            className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-surface-secondary transition-colors"
           >
-            <div className="h-7 w-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-medium">
-              {user ? `${user.firstName[0]}${user.lastName[0]}` : 'U'}
+            <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center text-white text-xs font-semibold">
+              {initials}
             </div>
-            <ChevronDown className="h-4 w-4 text-gray-500" />
+            <div className="hidden lg:block text-left">
+              <p className="text-sm font-medium text-text-primary">
+                {user.firstName} {user.lastName}
+              </p>
+              <p className="text-xs text-text-muted">{user.email}</p>
+            </div>
+            <ChevronDown className="hidden lg:block h-4 w-4 text-text-muted" />
           </button>
 
-          {dropdownOpen && (
-            <div className="absolute right-0 mt-2 w-48 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg py-1 z-50">
-              <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-800">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  {user?.firstName} {user?.lastName}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
-              </div>
-              <button
-                onClick={() => { setDropdownOpen(false); window.location.href = '/settings' }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+          <AnimatePresence>
+            {userMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                className="absolute right-0 mt-2 w-56 bg-surface rounded-xl border border-border shadow-lg shadow-slate-900/5 py-1"
               >
-                Settings
-              </button>
-              <button
-                onClick={() => { setDropdownOpen(false); logout() }}
-                className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                Logout
-              </button>
-            </div>
-          )}
+                <div className="px-3 py-2 border-b border-border">
+                  <p className="text-sm font-medium text-text-primary">
+                    {user.firstName} {user.lastName}
+                  </p>
+                  <p className="text-xs text-text-muted truncate">{user.email}</p>
+                  <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-medium">
+                    {user.role || 'ADMIN'}
+                  </span>
+                </div>
+                <Link
+                  href="/settings"
+                  className="flex items-center gap-3 px-3 py-2.5 text-sm text-text-secondary hover:bg-surface-secondary transition-colors"
+                  onClick={() => setUserMenuOpen(false)}
+                >
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-danger hover:bg-danger/5 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </header>

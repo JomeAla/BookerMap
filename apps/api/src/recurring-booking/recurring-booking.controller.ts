@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@ne
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { RecurringBookingService } from './recurring-booking.service';
+import { CreateRecurringBookingDto } from './dto/create-recurring-booking.dto';
 
 @ApiTags('Recurring Bookings')
 @ApiBearerAuth()
@@ -14,7 +15,7 @@ export class RecurringBookingController {
   @Post()
   @ApiOperation({ summary: 'Create a recurring booking', description: 'Create a new recurring booking schedule' })
   @ApiResponse({ status: 201, description: 'Recurring booking created' })
-  create(@TenantId() tenantId: string, @Body() dto: any) {
+  create(@TenantId() tenantId: string, @Body() dto: CreateRecurringBookingDto) {
     return this.service.create(tenantId, dto);
   }
 

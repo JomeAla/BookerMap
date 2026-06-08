@@ -1,41 +1,49 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+@theme {
+  --color-accent: #059669;
+  --color-accent-light: #34D399;
+  --color-accent-dark: #047857;
+  --color-accent-subtle: #D1FAE5;
+  --color-surface: #F8F9FC;
+  --color-surface-glass: rgba(255, 255, 255, 0.72);
+  --color-border: #E8ECF1;
+  --color-border-glass: rgba(255, 255, 255, 0.5);
+  --color-text: #1A1D23;
+  --color-text-secondary: #5F6672;
+  --color-text-muted: #969CA8;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+* { border-color: var(--color-border); }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-sans), system-ui, sans-serif;
 }
 
-@keyframes slide-in-from-right {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
+::selection { background: #059669; color: white; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D4D8E0; border-radius: 9999px; }
 
-.animate-in {
-  animation: slide-in-from-right 0.3s ease-out;
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  33% { transform: translateY(-12px) rotate(1deg); }
+  66% { transform: translateY(6px) rotate(-1deg); }
+}
+.animate-gradient { animation: gradient-shift 10s ease infinite; background-size: 300% 300%; }
+.animate-float { animation: float 7s ease-in-out infinite; }

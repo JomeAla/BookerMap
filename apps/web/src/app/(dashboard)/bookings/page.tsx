@@ -30,22 +30,33 @@ export default function BookingsPage() {
   const [search, setSearch] = React.useState('')
   const [statusFilter, setStatusFilter] = React.useState('')
   const [dateFilter, setDateFilter] = React.useState('')
+  const [page, setPage] = React.useState(1)
+  const limit = 20
+
+  React.useEffect(() => { setPage(1) }, [search, statusFilter, dateFilter])
 
   const params = React.useMemo(() => {
-    const p: Record<string, string> = {}
+    const p: Record<string, string> = { page: String(page), limit: String(limit) }
     if (search) p.search = search
     if (statusFilter) p.status = statusFilter
     if (dateFilter) p.date = dateFilter
     return p
-  }, [search, statusFilter, dateFilter])
+  }, [search, statusFilter, dateFilter, page])
 
-  const { data: bookings, isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['bookings', params],
     queryFn: async () => {
-      const { data } = await api.get('/bookings', { params })
-      return data.data as Booking[]
+      const { data: res } = await api.get('/bookings', { params })
+      return { items: res.data as Booking[], meta: res.meta as { total: number; page: number; limit: number; totalPages: number } }
     },
   })
+
+  const bookings = data?.items
+  const meta = data?.meta
+  const totalPages = meta?.totalPages ?? 1
+  const total = meta?.total ?? 0
+  const start = total === 0 ? 0 : (page - 1) * limit + 1
+  const end = Math.min(page * limit, total)
 
   return (
     <div className="space-y-6">
@@ -149,6 +160,33 @@ export default function BookingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {bookings && bookings.length > 0 && (
+        <div className="flex items-center justify-between px-1">
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            Showing {start}\u2013{end} of {total}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-gray-800 transition-colors"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= totalPages}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-gray-800 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

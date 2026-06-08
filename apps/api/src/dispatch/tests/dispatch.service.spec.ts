@@ -246,7 +246,7 @@ describe('DispatchService', () => {
       const result = await service.autoAssign('booking-1');
 
       expect(result).toBeDefined();
-      expect(result.status).toBe('ASSIGNED');
+      expect(result!.status).toBe('ASSIGNED');
     });
 
     it('should throw NotFoundException if booking not found', async () => {
@@ -263,7 +263,7 @@ describe('DispatchService', () => {
 
       const result = await service.autoAssign('booking-1');
 
-      expect(result.id).toBe('existing-dispatch');
+      expect(result!.id).toBe('existing-dispatch');
       expect(mockPrisma.dispatch.create).not.toHaveBeenCalled();
     });
 

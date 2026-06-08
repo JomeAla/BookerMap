@@ -1,11 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SentimentService } from './sentiment.service';
 
 @Injectable()
 export class SatisfactionService {
   private readonly logger = new Logger(SatisfactionService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private sentimentService: SentimentService,
+  ) {}
 
   async recordSurvey(tenantId: string, dto: {
     bookingId?: string;
@@ -16,6 +20,15 @@ export class SatisfactionService {
     feedback?: string;
     category?: string;
   }) {
+    let sentimentScore: number | null = null;
+    let sentimentLabel: string | null = null;
+
+    if (dto.feedback && dto.feedback.trim().length > 0) {
+      const sentiment = this.sentimentService.analyzeSentiment(dto.feedback);
+      sentimentScore = sentiment.score;
+      sentimentLabel = sentiment.label;
+    }
+
     return this.prisma.satisfactionSurvey.create({
       data: {
         tenantId,
@@ -26,6 +39,8 @@ export class SatisfactionService {
         scoreType: dto.scoreType || 'CSAT',
         feedback: dto.feedback || null,
         category: dto.category || null,
+        sentimentScore,
+        sentimentLabel,
       },
       include: {
         booking: { include: { service: true } },

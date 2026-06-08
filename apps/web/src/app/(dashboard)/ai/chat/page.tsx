@@ -1,26 +1,58 @@
 'use client'
 
 import * as React from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
-import { MessageSquare, Send, Loader2, AlertCircle, X } from 'lucide-react'
+import { MessageSquare, Send, Loader2, AlertCircle, X, Star } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import type { AiConversation, AiMessage } from '@/types'
+import { useToast } from '@/components/ui/toast'
 import { VoiceInputButton } from '@/components/chat/voice-input-button'
 import { VoiceOutputToggle } from '@/components/chat/voice-output-toggle'
 import { getSpeechService } from '@/lib/speech-service'
 
 interface Message {
+  id?: string
   role: 'user' | 'assistant'
   content: string
   quickReplies?: string[]
+  rating?: number | null
+}
+
+function StarRating({ messageId, rating, onRate }: { messageId?: string; rating?: number | null; onRate: (id: string, stars: number) => void }) {
+  const [hovered, setHovered] = React.useState<number | null>(null)
+  const current = rating ?? null
+
+  if (!messageId) return null
+
+  return (
+    <div className="flex items-center gap-0.5 mt-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          onClick={() => onRate(messageId, star)}
+          onMouseEnter={() => setHovered(star)}
+          onMouseLeave={() => setHovered(null)}
+          className="p-0 transition-colors"
+        >
+          <Star
+            className={`h-3.5 w-3.5 transition-colors ${
+              (hovered ?? current) >= star
+                ? 'fill-amber-400 text-amber-400'
+                : 'text-gray-300 dark:text-gray-600 hover:text-amber-300'
+            }`}
+          />
+        </button>
+      ))}
+    </div>
+  )
 }
 
 export default function AiChatPage() {
   const { user } = useAuth()
+  const { addToast } = useToast()
   const [messages, setMessages] = React.useState<Message[]>([])
   const [input, setInput] = React.useState('')
   const [loading, setLoading] = React.useState(false)
@@ -70,6 +102,25 @@ export default function AiChatPage() {
     }
   }, [])
 
+  const rateMutation = useMutation({
+    mutationFn: async ({ id, rating }: { id: string; rating: number }) => {
+      const { data } = await api.post(`/ai/messages/${id}/rate`, { rating })
+      return data.data
+    },
+    onSuccess: (_data, variables) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === variables.id ? { ...m, rating: variables.rating } : m
+        )
+      )
+      addToast('Thanks for your feedback!', 'success')
+    },
+  })
+
+  const handleRate = (messageId: string, stars: number) => {
+    rateMutation.mutate({ id: messageId, rating: stars })
+  }
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return
 
@@ -90,6 +141,7 @@ export default function AiChatPage() {
       setConversationId(result.conversationId)
 
       const assistantMessage: Message = {
+        id: result.messageId,
         role: 'assistant',
         content: result.reply,
         quickReplies: result.quickReplies,
@@ -202,18 +254,27 @@ export default function AiChatPage() {
                   {msg.content}
                 </div>
               </div>
-              {msg.role === 'assistant' && msg.quickReplies && msg.quickReplies.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-1.5 ml-1">
-                  {msg.quickReplies.map((qr) => (
-                    <button
-                      key={qr}
-                      onClick={() => sendMessage(qr)}
-                      disabled={loading}
-                      className="text-xs px-2.5 py-1 rounded-full border border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50"
-                    >
-                      {qr}
-                    </button>
-                  ))}
+              {msg.role === 'assistant' && (
+                <div className="ml-1">
+                  {msg.quickReplies && msg.quickReplies.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {msg.quickReplies.map((qr) => (
+                        <button
+                          key={qr}
+                          onClick={() => sendMessage(qr)}
+                          disabled={loading}
+                          className="text-xs px-2.5 py-1 rounded-full border border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50"
+                        >
+                          {qr}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <StarRating
+                    messageId={msg.id}
+                    rating={msg.rating}
+                    onRate={handleRate}
+                  />
                 </div>
               )}
             </div>

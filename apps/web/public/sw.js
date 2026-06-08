@@ -1,10 +1,11 @@
-const VERSION = 'v1';
+const VERSION = 'v2';
 const STATIC_CACHE = `bookermap-static-${VERSION}`;
 const API_CACHE = `bookermap-api-${VERSION}`;
 const DYNAMIC_CACHE = `bookermap-dynamic-${VERSION}`;
 
 const PRECACHE_URLS = [
-  '/',
+  '/dashboard',
+  '/login',
   '/offline',
   '/manifest.json',
   '/icons/icon.svg',
@@ -41,7 +42,8 @@ async function cacheFirst(request, cacheName) {
     }
     return response;
   } catch {
-    return caches.match('/offline');
+    if (request.mode === 'navigate') return caches.match('/offline');
+    return new Response('', { status: 408 });
   }
 }
 

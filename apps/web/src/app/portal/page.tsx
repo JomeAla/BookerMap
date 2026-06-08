@@ -13,8 +13,10 @@ import { StatusBadge } from '@/components/ui/badge'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { ToastProvider, useToast } from '@/components/ui/toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { CalendarCheck, Clock, User, Building2, CreditCard, History, Save, Edit2, Navigation, MessageSquare, ShieldAlert } from 'lucide-react'
+import { CalendarCheck, Clock, User, Building2, CreditCard, History, Save, Edit2, Navigation, MessageSquare, ShieldAlert, Star, Plus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { ChatWidget } from '@/components/chat/chat-widget'
+import BookingReviewForm from '@/components/reviews/booking-review-form'
 import dynamic from 'next/dynamic'
 import type { Booking, Dispute } from '@/types'
 import { JobStatus, DisputeType } from '@/types'
@@ -24,6 +26,7 @@ const TechnicianTracker = dynamic(() => import('@/components/map/technician-trac
 type Tab = 'bookings' | 'payments' | 'profile' | 'feedback' | 'disputes'
 
 function PortalContent() {
+  const router = useRouter()
   const [activeTab, setActiveTab] = React.useState<Tab>('bookings')
   const [editing, setEditing] = React.useState(false)
   const [form, setForm] = React.useState({ firstName: '', lastName: '', email: '', phone: '' })
@@ -55,6 +58,22 @@ function PortalContent() {
     },
     enabled: activeTab === 'disputes',
   })
+
+  const { data: payments, isLoading: paymentsLoading } = useQuery({
+    queryKey: ['portal-payments'],
+    queryFn: async () => {
+      try {
+        const { data } = await api.get('/invoices?status=PAID')
+        return (data.data || []) as any[]
+      } catch {
+        return []
+      }
+    },
+    enabled: activeTab === 'payments',
+  })
+
+  const [reviewDialog, setReviewDialog] = React.useState<{ open: boolean; bookingId: string }>({ open: false, bookingId: '' })
+  const [reviewedBookings, setReviewedBookings] = React.useState<Set<string>>(new Set())
 
   const [disputeDialog, setDisputeDialog] = React.useState(false)
   const [disputeForm, setDisputeForm] = React.useState({
@@ -157,7 +176,7 @@ function PortalContent() {
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Bookings</h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View and manage your appointments</p>
               </div>
-              <Button>Book New Service</Button>
+              <Button onClick={() => router.push('/bookings/new')}><Plus className="h-4 w-4 mr-1" /> Book New Service</Button>
             </div>
 
             {bookingsLoading ? (
@@ -168,7 +187,7 @@ function PortalContent() {
                   <CalendarCheck className="h-10 w-10 mx-auto mb-3 opacity-50" />
                   <p className="font-medium">No bookings yet</p>
                   <p className="text-sm mt-1">Book your first service to get started</p>
-                  <Button className="mt-4">Book Now</Button>
+                  <Button className="mt-4" onClick={() => router.push('/bookings/new')}>Book Now</Button>
                 </CardContent>
               </Card>
             ) : (
@@ -198,7 +217,16 @@ function PortalContent() {
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          <Button variant="outline" size="sm">View Details</Button>
+                          <Button variant="outline" size="sm" onClick={() => router.push(`/bookings/${booking.id}`)}>View Details</Button>
+                          {booking.status === 'COMPLETED' && !reviewedBookings.has(booking.id) && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setReviewDialog({ open: true, bookingId: booking.id })}
+                            >
+                              <Star className="h-4 w-4 mr-1" /> Write Review
+                            </Button>
+                          )}
                           {(booking.dispatch?.status === JobStatus.EN_ROUTE || booking.dispatch?.status === JobStatus.STARTED) && (
                             <span className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
                               <Navigation className="h-3 w-3" />
@@ -225,11 +253,47 @@ function PortalContent() {
         )}
 
         {activeTab === 'payments' && (
-          <div className="text-center py-12 text-gray-500">
-            <History className="h-10 w-10 mx-auto mb-3 opacity-50" />
-            <p className="font-medium">Payment History</p>
-            <p className="text-sm mt-1">Your payment history will appear here</p>
-          </div>
+          <>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Payment History</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View your payment history</p>
+              </div>
+            </div>
+            {paymentsLoading ? (
+              <TableSkeleton rows={4} />
+            ) : !payments?.length ? (
+              <Card>
+                <CardContent className="text-center py-12 text-gray-500">
+                  <CreditCard className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                  <p className="font-medium">No payments yet</p>
+                  <p className="text-sm mt-1">Your payment history will appear here</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {payments.map((payment: any) => (
+                  <Card key={payment.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <h3 className="font-semibold text-gray-900 dark:text-white">
+                            {payment.invoiceNumber || `INV-${payment.id?.slice(0, 8)}`}
+                          </h3>
+                          <p className="text-sm text-gray-500">
+                            {payment.dueDate ? formatDate(payment.dueDate, 'MMM d, yyyy') : formatDate(payment.createdAt, 'MMM d, yyyy')}
+                          </p>
+                        </div>
+                        <span className="font-semibold text-blue-600 dark:text-blue-400">
+                          {formatCurrency(payment.total || payment.amount)}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         {activeTab === 'profile' && (
@@ -438,6 +502,18 @@ function PortalContent() {
           </>
         )}
       </main>
+      <Dialog open={reviewDialog.open} onOpenChange={(o) => setReviewDialog({ ...reviewDialog, open: o })}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Write a Review</DialogTitle></DialogHeader>
+          <BookingReviewForm
+            bookingId={reviewDialog.bookingId}
+            onSubmitted={() => {
+              setReviewDialog({ open: false, bookingId: '' })
+              setReviewedBookings((prev) => new Set(prev).add(reviewDialog.bookingId))
+            }}
+          />
+        </DialogContent>
+      </Dialog>
       <ChatWidget />
     </div>
   )

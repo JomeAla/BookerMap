@@ -5,6 +5,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { SettlementService } from './settlement.service';
+import { SettlementReconciliationService } from './settlement-reconciliation.service';
 import { GenerateSettlementDto } from './dto/generate-settlement.dto';
 import { CompleteSettlementDto } from './dto/complete-settlement.dto';
 import { FailSettlementDto } from './dto/fail-settlement.dto';
@@ -12,7 +13,10 @@ import { FailSettlementDto } from './dto/fail-settlement.dto';
 @Controller('settlements')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SettlementController {
-  constructor(private readonly settlementService: SettlementService) {}
+  constructor(
+    private readonly settlementService: SettlementService,
+    private readonly reconciliationService: SettlementReconciliationService,
+  ) {}
 
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @Post('generate')
@@ -57,6 +61,41 @@ export class SettlementController {
     @TenantId() tenantId: string,
   ) {
     return this.settlementService.getProviderSettlements(providerId, tenantId);
+  }
+
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @Post('reconcile/paystack')
+  reconcilePaystack(
+    @TenantId() tenantId: string,
+    @Body() body: { startDate?: string; endDate?: string },
+  ) {
+    return this.reconciliationService.reconcilePaystack(tenantId, body.startDate, body.endDate);
+  }
+
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @Post('reconcile/flutterwave')
+  reconcileFlutterwave(
+    @TenantId() tenantId: string,
+    @Body() body: { startDate?: string; endDate?: string },
+  ) {
+    return this.reconciliationService.reconcileFlutterwave(tenantId, body.startDate, body.endDate);
+  }
+
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @Post('reconcile/all')
+  reconcileAll(
+    @TenantId() tenantId: string,
+    @Body() body: { startDate?: string; endDate?: string },
+  ) {
+    return this.reconciliationService.reconcileAll(tenantId, body.startDate, body.endDate);
+  }
+
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @Get('reconciliation-report')
+  reconciliationReport(@TenantId() tenantId: string) {
+    const report = this.reconciliationService.getLastReconciliationReport(tenantId);
+    const history = this.reconciliationService.getReconciliationHistory(tenantId);
+    return { report, history };
   }
 
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER)

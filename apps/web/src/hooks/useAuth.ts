@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
-import { getToken, setToken, removeToken, setUser, getUser, isAuthenticated } from '@/lib/auth'
+import { getToken, setToken, setRefreshToken, removeToken, setUser, getUser, isAuthenticated, getRefreshToken } from '@/lib/auth'
 import type { User } from '@/types'
 
 export function useAuth() {
@@ -22,22 +22,30 @@ export function useAuth() {
     const res = await api.post('/auth/login', { email, password })
     const payload = res.data.data
     setToken(payload.accessToken)
+    setRefreshToken(payload.refreshToken)
     setUser(payload.user)
     setUserState(payload.user)
     return payload.user
   }, [])
 
-  const register = useCallback(async (payload: { businessName: string; email: string; password: string }) => {
-    const { data } = await api.post('/auth/register', payload)
-    setToken(data.token)
-    setUser(data.user)
-    setUserState(data.user)
-    return data.user
+  const register = useCallback(async (payload: { firstName: string; lastName: string; email: string; password: string; tenantSlug: string }) => {
+    await api.post('/auth/register', payload)
+    const loginRes = await api.post('/auth/login', { email: payload.email, password: payload.password })
+    const loginPayload = loginRes.data.data
+    setToken(loginPayload.accessToken)
+    setRefreshToken(loginPayload.refreshToken)
+    setUser(loginPayload.user)
+    setUserState(loginPayload.user)
+    return loginPayload.user
   }, [])
 
   const logout = useCallback(() => {
+    const refreshToken = getRefreshToken()
     removeToken()
     setUserState(null)
+    if (refreshToken) {
+      api.post('/auth/logout', { refreshToken }).catch(() => {})
+    }
     router.push('/login')
   }, [router])
 

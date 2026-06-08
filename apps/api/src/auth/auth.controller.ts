@@ -114,7 +114,8 @@ export class AuthController {
   @ApiResponse({ status: 302, description: 'Redirects to frontend with tokens' })
   async googleAuthRedirect(@Req() req: any, @Res() res: any) {
     const { accessToken, refreshToken } = req.user;
-    res.redirect(`http://localhost:3000/auth/callback?accessToken=${accessToken}&refreshToken=${refreshToken}`);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/auth/callback?accessToken=${accessToken}&refreshToken=${refreshToken}`);
   }
 
   @Get('microsoft')
@@ -129,7 +130,8 @@ export class AuthController {
   @ApiResponse({ status: 302, description: 'Redirects to frontend with tokens' })
   async microsoftAuthRedirect(@Req() req: any, @Res() res: any) {
     const { accessToken, refreshToken } = req.user;
-    res.redirect(`http://localhost:3000/auth/callback?accessToken=${accessToken}&refreshToken=${refreshToken}`);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/auth/callback?accessToken=${accessToken}&refreshToken=${refreshToken}`);
   }
 
   @Post('2fa/generate')

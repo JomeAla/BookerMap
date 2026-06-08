@@ -5,6 +5,19 @@ import { CreateDispatchDto } from './dto/create-dispatch.dto';
 import { AutoAssignmentService } from './auto-assignment.service';
 import { BookingGateway } from '../gateway/booking.gateway';
 
+type TimeBlock = { start: string; end: string };
+type Availability = Record<string, TimeBlock[]> | null;
+
+function isTechnicianAvailable(availability: Availability, dateTime: Date): boolean {
+  if (!availability) return true;
+  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const dayName = days[dateTime.getDay()];
+  const slots = availability[dayName];
+  if (!slots || slots.length === 0) return false;
+  const time = `${dateTime.getHours().toString().padStart(2, '0')}:${dateTime.getMinutes().toString().padStart(2, '0')}`;
+  return slots.some(s => time >= s.start && time <= s.end);
+}
+
 @Injectable()
 export class DispatchService {
   private readonly logger = new Logger(DispatchService.name);
@@ -28,6 +41,10 @@ export class DispatchService {
       where: { id: dto.assignedToId, tenantId },
     });
     if (!technician) throw new NotFoundException('Technician not found');
+
+    if (booking.startTime && !isTechnicianAvailable(technician.availability as Availability, new Date(booking.startTime))) {
+      throw new BadRequestException('Technician is not available at the booking time');
+    }
 
     return this.prisma.dispatch.create({
       data: {
@@ -82,11 +99,15 @@ export class DispatchService {
   }
 
   async assignTechnician(tenantId: string, id: string, assignedToId: string) {
-    await this.findById(tenantId, id);
+    const dispatch = await this.findById(tenantId, id);
     const technician = await this.prisma.user.findFirst({
       where: { id: assignedToId, tenantId },
     });
     if (!technician) throw new NotFoundException('Technician not found');
+
+    if (dispatch.booking.startTime && !isTechnicianAvailable(technician.availability as Availability, new Date(dispatch.booking.startTime))) {
+      throw new BadRequestException('Technician is not available at the booking time');
+    }
     return this.prisma.dispatch.update({
       where: { id },
       data: { assignedToId },

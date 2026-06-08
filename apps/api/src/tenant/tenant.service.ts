@@ -71,4 +71,36 @@ export class TenantService {
       data: dto,
     });
   }
+
+  async findAll(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.tenant.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: { select: { users: true, bookings: true } },
+        },
+      }),
+      this.prisma.tenant.count(),
+    ]);
+    return {
+      data,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async toggleActive(id: string, active: boolean) {
+    await this.findById(id);
+    return this.prisma.tenant.update({
+      where: { id },
+      data: { isActive: active },
+    });
+  }
+
+  async remove(id: string) {
+    await this.findById(id);
+    return this.prisma.tenant.delete({ where: { id } });
+  }
 }

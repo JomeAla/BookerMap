@@ -13,7 +13,9 @@ import { Badge, StatusBadge } from '@/components/ui/badge'
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
-import { Users, UserPlus, Shield, Clock, Send, X, Plus, DollarSign, Wallet } from 'lucide-react'
+import { AvailabilityEditor } from '@/components/team/availability-editor'
+import { SkillsEditor } from '@/components/team/skills-editor'
+import { Users, UserPlus, Shield, Clock, Send, X, Plus, DollarSign, Wallet, Percent, TrendingUp } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { User, UserRole, SplitPayment } from '@/types'
 
@@ -36,6 +38,17 @@ export default function TeamPage() {
     queryFn: async () => {
       const { data } = await api.get('/users')
       return data.data as User[]
+    },
+  })
+
+  const { data: commissionSummary } = useQuery({
+    queryKey: ['commission-summary-team'],
+    queryFn: async () => {
+      const now = new Date()
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+      const todayStr = now.toISOString().slice(0, 10)
+      const { data } = await api.get('/commission/summary', { params: { startDate: firstOfMonth, endDate: todayStr } })
+      return data.data as { totalCommission: number; totalRevenue: number; technicians: number; averageCommissionRate: number }
     },
   })
 
@@ -76,8 +89,6 @@ export default function TeamPage() {
 
   const [skillsDialogOpen, setSkillsDialogOpen] = React.useState(false)
   const [editingSkillsUser, setEditingSkillsUser] = React.useState<User | null>(null)
-  const [skillsInput, setSkillsInput] = React.useState('')
-  const [currentSkills, setCurrentSkills] = React.useState<string[]>([])
 
   const [commissionDialogOpen, setCommissionDialogOpen] = React.useState(false)
   const [editingCommissionUser, setEditingCommissionUser] = React.useState<User | null>(null)
@@ -85,6 +96,10 @@ export default function TeamPage() {
 
   const [earningsDialogOpen, setEarningsDialogOpen] = React.useState(false)
   const [viewingEarningsUser, setViewingEarningsUser] = React.useState<User | null>(null)
+
+  const [availabilityDialogOpen, setAvailabilityDialogOpen] = React.useState(false)
+  const [editingAvailabilityUser, setEditingAvailabilityUser] = React.useState<User | null>(null)
+  const [availabilityData, setAvailabilityData] = React.useState<Record<string, Array<{ start: string; end: string }>>>({})
 
   const { data: providerEarnings } = useQuery({
     queryKey: ['provider-earnings', viewingEarningsUser?.id],
@@ -115,6 +130,19 @@ export default function TeamPage() {
     setEarningsDialogOpen(true)
   }
 
+  const openAvailabilityDialog = async (member: User) => {
+    setEditingAvailabilityUser(member)
+    setAvailabilityData({})
+    setAvailabilityDialogOpen(true)
+    try {
+      const { data } = await api.get(`/users/${member.id}/availability`)
+      const avail = data.data
+      setAvailabilityData((avail && typeof avail === 'object' ? avail : {}) as Record<string, Array<{ start: string; end: string }>>)
+    } catch {
+      setAvailabilityData({})
+    }
+  }
+
   const saveCommission = async () => {
     if (!editingCommissionUser) return
     try {
@@ -130,44 +158,9 @@ export default function TeamPage() {
     }
   }
 
-  const { data: allSkills } = useQuery({
-    queryKey: ['all-skills'],
-    queryFn: async () => {
-      const { data } = await api.get('/services/skills')
-      return data.data as string[]
-    },
-    enabled: skillsDialogOpen,
-  })
-
   const openSkillsDialog = (member: User) => {
     setEditingSkillsUser(member)
-    setCurrentSkills(member.skills || [])
-    setSkillsInput('')
     setSkillsDialogOpen(true)
-  }
-
-  const addSkill = (skill: string) => {
-    const trimmed = skill.trim()
-    if (trimmed && !currentSkills.includes(trimmed)) {
-      setCurrentSkills([...currentSkills, trimmed])
-    }
-    setSkillsInput('')
-  }
-
-  const removeSkill = (skill: string) => {
-    setCurrentSkills(currentSkills.filter((s) => s !== skill))
-  }
-
-  const saveSkills = async () => {
-    if (!editingSkillsUser) return
-    try {
-      await api.put(`/users/${editingSkillsUser.id}/skills`, { skills: currentSkills })
-      addToast('Skills updated', 'success')
-      setSkillsDialogOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['team'] })
-    } catch (err: any) {
-      addToast(err.response?.data?.message || 'Failed to update skills', 'error')
-    }
   }
 
   const queryClient = useQueryClient()
@@ -256,52 +249,9 @@ export default function TeamPage() {
         <Dialog open={skillsDialogOpen} onOpenChange={setSkillsDialogOpen}>
           <DialogContent>
             <DialogHeader><DialogTitle>Skills — {editingSkillsUser?.firstName} {editingSkillsUser?.lastName}</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                {currentSkills.length === 0 ? (
-                  <p className="text-sm text-gray-400">No skills assigned</p>
-                ) : (
-                  currentSkills.map((skill) => (
-                    <span key={skill} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-md text-sm">
-                      {skill}
-                      <button onClick={() => removeSkill(skill)} className="hover:text-red-600">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))
-                )}
-              </div>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Input
-                    placeholder="Type a skill..."
-                    value={skillsInput}
-                    onChange={(e) => setSkillsInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        addSkill(skillsInput)
-                      }
-                    }}
-                    list="skill-suggestions"
-                  />
-                  <datalist id="skill-suggestions">
-                    {(allSkills || [])
-                      .filter((s) => !currentSkills.includes(s))
-                      .map((s) => (
-                        <option key={s} value={s} />
-                      ))}
-                  </datalist>
-                </div>
-                <Button onClick={() => addSkill(skillsInput)} disabled={!skillsInput.trim()}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <Button variant="outline" onClick={() => setSkillsDialogOpen(false)}>Cancel</Button>
-                <Button onClick={saveSkills}>Save</Button>
-              </div>
-            </div>
+            {editingSkillsUser && (
+              <SkillsEditor userId={editingSkillsUser.id} skills={editingSkillsUser.skills || []} />
+            )}
           </DialogContent>
         </Dialog>
 
@@ -334,6 +284,45 @@ export default function TeamPage() {
             </div>
           </DialogContent>
         </Dialog>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+              <DollarSign className="h-4 w-4 text-green-600" />
+              Total Commission Paid
+            </div>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              {commissionSummary ? formatCurrency(commissionSummary.totalCommission) : '...'}
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">This month</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+              <Percent className="h-4 w-4 text-purple-600" />
+              Average Commission Rate
+            </div>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              {commissionSummary ? `${commissionSummary.averageCommissionRate.toFixed(1)}%` : '...'}
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">This month</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+              <Users className="h-4 w-4 text-indigo-600" />
+              Active Technicians
+            </div>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              {team ? team.filter((m) => m.role === 'TECHNICIAN' && m.isActive).length : '...'}
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">On your team</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -414,9 +403,11 @@ export default function TeamPage() {
                       <TableCell className="text-sm">
                         {member.role === 'TECHNICIAN' ? (
                           member.commissionRate ? (
-                            <Badge variant="secondary" className="text-xs">
-                              {member.commissionType === 'FIXED' ? `$${member.commissionRate}` : `${member.commissionRate}%`}
-                            </Badge>
+                            <Link href={`/reports/commissions?techId=${member.id}`}>
+                              <Badge variant="secondary" className="text-xs cursor-pointer hover:opacity-80">
+                                {member.commissionType === 'FIXED' ? `$${member.commissionRate}` : `${member.commissionRate}%`}
+                              </Badge>
+                            </Link>
                           ) : (
                             <span className="text-gray-400">—</span>
                           )
@@ -510,7 +501,26 @@ export default function TeamPage() {
                   </div>
                 )}
               </div>
+
+              <div className="pt-2 flex justify-end">
+                <Link href={`/reports/commissions?techId=${viewingEarningsUser?.id}`}>
+                  <Button variant="outline" size="sm">
+                    <TrendingUp className="h-4 w-4 mr-2" /> View Full Commission Report
+                  </Button>
+                </Link>
+              </div>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={availabilityDialogOpen} onOpenChange={setAvailabilityDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Availability — {editingAvailabilityUser?.firstName} {editingAvailabilityUser?.lastName}</DialogTitle>
+          </DialogHeader>
+          {editingAvailabilityUser && (
+            <AvailabilityEditor userId={editingAvailabilityUser.id} availability={availabilityData} />
           )}
         </DialogContent>
       </Dialog>

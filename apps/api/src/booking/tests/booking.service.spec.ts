@@ -4,6 +4,9 @@ import { BookingService } from '../booking.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SchedulingService } from '../scheduling.service';
 import { WebhookService } from '../../webhook/webhook.service';
+import { DispatchService } from '../../dispatch/dispatch.service';
+import { PricingService } from '../../pricing/pricing.service';
+import { BookingGateway } from '../../gateway/booking.gateway';
 
 describe('BookingService', () => {
   let service: BookingService;
@@ -28,6 +31,9 @@ describe('BookingService', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    user: {
+      findFirst: jest.fn(),
+    },
   };
 
   const mockSchedulingService = {
@@ -38,6 +44,23 @@ describe('BookingService', () => {
     dispatchEvent: jest.fn().mockResolvedValue(true),
   };
 
+  const mockDispatchService = {
+    autoAssign: jest.fn().mockResolvedValue(true),
+  };
+
+  const mockPricingService = {
+    applyPricing: jest.fn().mockImplementation((_tenantId: string, price: number) => ({
+      finalPrice: price,
+      rulesApplied: [],
+    })),
+  };
+
+  const mockBookingGateway = {
+    notifyBookingCreated: jest.fn(),
+    notifyBookingCanceled: jest.fn(),
+    notifyBookingUpdated: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -45,6 +68,9 @@ describe('BookingService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: SchedulingService, useValue: mockSchedulingService },
         { provide: WebhookService, useValue: mockWebhookService },
+        { provide: DispatchService, useValue: mockDispatchService },
+        { provide: PricingService, useValue: mockPricingService },
+        { provide: BookingGateway, useValue: mockBookingGateway },
       ],
     }).compile();
 
@@ -55,6 +81,11 @@ describe('BookingService', () => {
 
     jest.clearAllMocks();
     mockSchedulingService.checkConflicts.mockResolvedValue(false);
+    mockPricingService.applyPricing.mockImplementation((_tenantId: string, price: number) => ({
+      finalPrice: price,
+      rulesApplied: [],
+    }));
+    mockPrisma.user.findFirst.mockResolvedValue({ id: 'tech-1', tenantId: 'tenant-1', availability: null });
   });
 
   it('should be defined', () => {

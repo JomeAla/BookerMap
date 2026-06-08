@@ -6,6 +6,21 @@ import { PublicCreateBookingDto } from './dto/public-create-booking.dto';
 export class PublicService {
   constructor(private prisma: PrismaService) {}
 
+  async getStats() {
+    const [totalBookings, totalBusinesses, totalCustomers, totalServices, revenueAgg] = await Promise.all([
+      this.prisma.booking.count(),
+      this.prisma.tenant.count({ where: { isActive: true } }),
+      this.prisma.customer.count(),
+      this.prisma.service.count({ where: { isActive: true } }),
+      this.prisma.payment.aggregate({
+        where: { status: 'SUCCESS' },
+        _sum: { amount: true },
+      }),
+    ]);
+    const totalRevenue = revenueAgg._sum.amount ?? 0;
+    return { totalBookings, totalBusinesses, totalCustomers, totalServices, totalRevenue };
+  }
+
   async getTenantBySlug(slug: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { slug },

@@ -259,18 +259,61 @@ export class FlutterwaveService implements PaymentProvider {
     }
   }
 
-  async initiatePOSCharge(amount: number, email: string, currency?: string): Promise<{ reference: string; note: string }> {
-    const reference = `BMR-POS-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
-    return {
-      reference,
-      note: `POS charge of ${currency || 'NGN'} ${amount} initiated. Handles payment on the Flutterwave POS terminal.`,
-    };
+  async initiatePOSCharge(amount: number, email: string, currency: string = 'NGN', tenantId: string): Promise<{ reference: string; note: string }> {
+    const headers = await this.getAuthHeaders(tenantId);
+    const txRef = `BMR-POS-${tenantId.slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
+
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/charges?type=pos`,
+        {
+          tx_ref: txRef,
+          amount,
+          currency,
+          email,
+          is_pos: true,
+        },
+        { headers },
+      );
+
+      const data = response.data.data;
+      return {
+        reference: data.tx_ref || txRef,
+        note: `POS charge of ${currency} ${amount} sent to terminal. Status: ${data.status || 'pending'}`,
+      };
+    } catch (error) {
+      this.handleError(error, 'POS charge initiation failed');
+    }
   }
 
-  async verifyPOSCharge(reference: string): Promise<{ status: string; amount?: number }> {
-    return {
-      status: 'success',
-      amount: undefined,
-    };
+  async listSettlements(tenantId: string, from?: Date, to?: Date): Promise<any[]> {
+    const headers = await this.getAuthHeaders(tenantId);
+    try {
+      const params: Record<string, any> = {};
+      if (from) params.from = from.toISOString().split('T')[0];
+      if (to) params.to = to.toISOString().split('T')[0];
+      const response = await axios.get(`${this.baseUrl}/settlements`, {
+        headers,
+        params,
+      });
+      return response.data.data || [];
+    } catch (error) {
+      this.logger.error('Failed to fetch Flutterwave settlements', error);
+      return [];
+    }
+  }
+
+  async verifyPOSCharge(reference: string, tenantId: string): Promise<{ status: string; amount?: number }> {
+    const headers = await this.getAuthHeaders(tenantId);
+    try {
+      const response = await axios.get(`${this.baseUrl}/transactions/${reference}/verify`, { headers });
+      const data = response.data.data;
+      return {
+        status: data.status,
+        amount: data.amount,
+      };
+    } catch (error) {
+      this.handleError(error, 'POS charge verification failed');
+    }
   }
 }

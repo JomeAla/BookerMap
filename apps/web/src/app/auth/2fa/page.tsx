@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { api } from '@/lib/api'
-import { setToken, setUser } from '@/lib/auth'
+import { setToken, setRefreshToken, setUser } from '@/lib/auth'
 
 export default function TwoFactorAuthPage() {
   const router = useRouter()
@@ -28,6 +28,7 @@ export default function TwoFactorAuthPage() {
       const { data } = await api.post('/auth/2fa/validate', { userId, token })
       const payload = data.data
       setToken(payload.accessToken)
+      setRefreshToken(payload.refreshToken)
       setUser(payload.user)
       router.push('/dashboard')
     } catch (err: any) {

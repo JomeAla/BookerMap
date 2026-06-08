@@ -4,7 +4,7 @@ function Spinner({ className, size = 'md' }: { className?: string; size?: 'sm' |
   return (
     <div
       className={cn(
-        'animate-spin rounded-full border-2 border-current border-t-transparent text-blue-600',
+        'animate-spin rounded-full border-2 border-current border-t-transparent text-[var(--color-accent)]',
         {
           'h-4 w-4': size === 'sm',
           'h-6 w-6': size === 'md',

@@ -87,9 +87,18 @@ export class ReviewService {
     });
   }
 
-  async findPublic(serviceId?: string) {
+  async findPublic(tenantSlug?: string, serviceId?: string) {
     const where: any = { status: 'APPROVED' };
-    if (serviceId) where.booking = { serviceId };
+
+    if (tenantSlug) {
+      const tenant = await this.prisma.tenant.findUnique({ where: { slug: tenantSlug } });
+      if (!tenant) return [];
+      where.tenantId = tenant.id;
+    }
+
+    if (serviceId) {
+      where.booking = { ...(where.booking || {}), serviceId };
+    }
 
     return this.prisma.review.findMany({
       where,

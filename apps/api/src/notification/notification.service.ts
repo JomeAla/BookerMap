@@ -3,12 +3,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationType } from '@prisma/client';
 import { NotificationFilterDto } from './dto/notification-filter.dto';
 import { BookingGateway } from '../gateway/booking.gateway';
+import { WebPushService } from './web-push.service';
 
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
 
-  constructor(private prisma: PrismaService, private bookingGateway: BookingGateway) {}
+  constructor(
+    private prisma: PrismaService,
+    private bookingGateway: BookingGateway,
+    private webPushService: WebPushService,
+  ) {}
 
    async sendEmail(tenantId: string, recipient: string, subject: string, body: string, html?: string) {
      const notification = await this.createNotification(tenantId, NotificationType.EMAIL, 'EMAIL', recipient, subject, body);
@@ -38,7 +43,16 @@ export class NotificationService {
       where: { id: notification.id },
       data: { userId },
     });
-    return notification;
+
+    const result = await this.webPushService.send(userId, { title, body });
+    if (result.sent > 0) {
+      await this.prisma.notification.update({
+        where: { id: notification.id },
+        data: { sentAt: new Date(), status: 'SENT' },
+      });
+    }
+
+    return { notification, pushResult: result };
   }
 
   async sendInApp(tenantId: string, userId: string, title: string, body: string) {

@@ -5,7 +5,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ChatService } from './services/chat.service';
 import { AnalyticsService } from './services/analytics.service';
 import { EscalationService } from './services/escalation.service';
-import { ChatMessageDto, CreateResponseDto } from './dto/chat-message.dto';
+import { ChatMessageDto, CreateResponseDto, RateMessageDto } from './dto/chat-message.dto';
 import { AiSettingsDto } from './dto/ai-settings.dto';
 import { EscalateDto, AssignEscalationDto, ResolveEscalationDto, EscalationFilterDto } from './dto/escalation.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -34,11 +34,22 @@ export class AiAgentController {
         tenantId = tenant.id;
       }
     }
-    return this.chatService.processMessage(
+    const result = await this.chatService.processMessage(
       dto.message,
       tenantId,
       dto.conversationId,
     );
+    if (result.conversationId) {
+      const lastAssistant = await this.prisma.aiMessage.findFirst({
+        where: { conversationId: result.conversationId, role: 'assistant' },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+      if (lastAssistant) {
+        return { ...result, messageId: lastAssistant.id };
+      }
+    }
+    return result;
   }
 
   @UseGuards(JwtAuthGuard)
@@ -124,6 +135,44 @@ export class AiAgentController {
   @ApiResponse({ status: 200, description: 'Failed conversations' })
   async getFailedConversations(@CurrentUser() user: any) {
     return this.analyticsService.getFailedConversations(user.tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('messages/:id/rate')
+  @ApiOperation({ summary: 'Rate AI message', description: 'Rate an assistant message 1-5 stars with optional feedback' })
+  @ApiParam({ name: 'id', type: String, description: 'AI message ID' })
+  @ApiResponse({ status: 200, description: 'Message rated' })
+  async rateMessage(
+    @Param('id') id: string,
+    @Body() dto: RateMessageDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.analyticsService.rateMessage(id, user.tenantId, user.sub, dto.rating, dto.feedback);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('analytics/feedback')
+  @ApiOperation({ summary: 'Get AI feedback stats', description: 'Returns aggregate rating stats for assistant messages' })
+  @ApiResponse({ status: 200, description: 'Feedback stats' })
+  async getFeedbackStats(@CurrentUser() user: any) {
+    return this.analyticsService.getFeedbackStats(user.tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('analytics/messages')
+  @ApiOperation({ summary: 'Get recent rated messages', description: 'Returns recent assistant messages with ratings and feedback' })
+  @ApiQuery({ name: 'limit', required: false, type: String, description: 'Max messages to return (default 20, max 100)' })
+  @ApiResponse({ status: 200, description: 'Recent rated messages' })
+  async getRecentRatedMessages(
+    @Query('limit') limit: string | undefined,
+    @CurrentUser() user: any,
+  ) {
+    const parsed = limit ? parseInt(limit, 10) : 20;
+    const safeLimit = Number.isFinite(parsed) && parsed > 0 ? parsed : 20;
+    return this.analyticsService.getRecentRatedMessages(user.tenantId, safeLimit);
   }
 
   @UseGuards(JwtAuthGuard)

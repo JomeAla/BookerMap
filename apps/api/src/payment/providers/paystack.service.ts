@@ -242,12 +242,40 @@ export class PaystackService implements PaymentProvider {
     }
   }
 
-  async listTerminals(): Promise<{ terminalId: string; name: string; status: string }[]> {
-    return [
-      { terminalId: 'TML-001', name: 'Main Counter POS', status: 'active' },
-      { terminalId: 'TML-002', name: 'Mobile POS 1', status: 'active' },
-      { terminalId: 'TML-003', name: 'Backup Terminal', status: 'inactive' },
-    ];
+  async listTerminals(tenantId?: string): Promise<{ id: string; name: string; status: string; lastSeen?: string }[]> {
+    const { secretKey } = await this.resolveCredentials(tenantId || '');
+    try {
+      const response = await axios.get(`${this.baseUrl}/terminal`, {
+        headers: this.getHeaders(secretKey),
+        params: { perPage: 50 },
+      });
+      return (response.data.data || []).map((t: any) => ({
+        id: t.id?.toString() || t.terminal_id,
+        name: t.name || t.label || `Terminal ${t.id}`,
+        status: t.status === 'active' ? 'online' : 'offline',
+        lastSeen: t.last_seen || t.updatedAt || t.updated_at,
+      }));
+    } catch (error) {
+      this.logger.error('Failed to fetch Paystack terminals', error);
+      return [];
+    }
+  }
+
+  async listSettlements(tenantId: string, from?: Date, to?: Date): Promise<any[]> {
+    const { secretKey } = await this.resolveCredentials(tenantId);
+    try {
+      const params: Record<string, any> = { perPage: 50 };
+      if (from) params.from = from.toISOString().split('T')[0];
+      if (to) params.to = to.toISOString().split('T')[0];
+      const response = await axios.get(`${this.baseUrl}/settlement`, {
+        headers: this.getHeaders(secretKey),
+        params,
+      });
+      return response.data.data || [];
+    } catch (error) {
+      this.logger.error('Failed to fetch Paystack settlements', error);
+      return [];
+    }
   }
 
   async listCustomerCards(customerCode: string): Promise<any[]> {

@@ -6,13 +6,13 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Card, CardTitle, CardContent } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { formatCurrency } from '@/lib/utils'
 import { ChevronLeft, ChevronRight, Calendar, Clock, Building2 } from 'lucide-react'
 import { ChatWidget } from '@/components/chat/chat-widget'
+import PublicReviewList from '@/components/reviews/public-review-list'
 import type { Service, Tenant } from '@/types'
 
 export default function PublicBookingPage() {
@@ -43,15 +43,30 @@ export default function PublicBookingPage() {
 
   const selectedService = services?.find((s) => s.id === selectedServiceId)
 
-  const timeSlots = React.useMemo(() => {
-    if (!selectedDate) return []
+  const fallbackSlots = React.useMemo(() => {
     const slots = []
     for (let h = 8; h <= 17; h++) {
       slots.push(`${h.toString().padStart(2, '0')}:00`)
       if (h < 17) slots.push(`${h.toString().padStart(2, '0')}:30`)
     }
     return slots
-  }, [selectedDate])
+  }, [])
+
+  const { data: apiSlots } = useQuery({
+    queryKey: ['public-slots', tenantSlug, selectedServiceId, selectedDate],
+    queryFn: async () => {
+      if (!selectedServiceId || !selectedDate) return []
+      try {
+        const { data } = await api.get(`/public/${tenantSlug}/slots?serviceId=${selectedServiceId}&date=${selectedDate}`)
+        return data.data as string[]
+      } catch {
+        return []
+      }
+    },
+    enabled: !!selectedServiceId && !!selectedDate,
+  })
+
+  const timeSlots = apiSlots && apiSlots.length > 0 ? apiSlots : fallbackSlots
 
   const bookingMutation = useMutation({
     mutationFn: async () => {
@@ -233,6 +248,7 @@ export default function PublicBookingPage() {
             </div>
           </CardContent>
         </Card>
+        <PublicReviewList tenantSlug={tenantSlug} />
       </div>
       <ChatWidget tenantSlug={tenantSlug} />
     </div>

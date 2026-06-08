@@ -19,7 +19,7 @@ export class TechnicianController {
   async getMyJobs(@CurrentUser() user: any, @TenantId() tenantId: string) {
     const dispatches = await this.prisma.dispatch.findMany({
       where: {
-        assignedToId: user.sub,
+        assignedToId: user.id,
         booking: { tenantId, startTime: { gte: new Date(new Date().toDateString()) } },
       },
       include: {
@@ -48,7 +48,7 @@ export class TechnicianController {
     @TenantId() tenantId: string,
   ) {
     const dispatch = await this.prisma.dispatch.findFirst({
-      where: { id: dispatchId, assignedToId: user.sub, booking: { tenantId } },
+      where: { id: dispatchId, assignedToId: user.id, booking: { tenantId } },
     });
     if (!dispatch) throw new HttpException('Dispatch not found', 404);
 

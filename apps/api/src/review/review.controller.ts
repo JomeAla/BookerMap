@@ -45,11 +45,15 @@ export class ReviewController {
   }
 
   @Get('public')
-  @ApiOperation({ summary: 'Get public reviews', description: 'Returns approved public reviews, optionally filtered by service' })
+  @ApiOperation({ summary: 'Get public reviews', description: 'Returns approved public reviews, optionally filtered by tenantSlug or serviceId' })
+  @ApiQuery({ name: 'tenantSlug', required: false, type: String, description: 'Filter by tenant slug' })
   @ApiQuery({ name: 'serviceId', required: false, type: String, description: 'Filter by service ID' })
   @ApiResponse({ status: 200, description: 'List of public reviews' })
-  findPublic(@Query('serviceId') serviceId?: string) {
-    return this.reviewService.findPublic(serviceId);
+  findPublic(
+    @Query('tenantSlug') tenantSlug?: string,
+    @Query('serviceId') serviceId?: string,
+  ) {
+    return this.reviewService.findPublic(tenantSlug, serviceId);
   }
 
   @Patch(':id/approve')

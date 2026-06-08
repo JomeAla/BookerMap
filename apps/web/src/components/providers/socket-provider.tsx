@@ -2,6 +2,7 @@
 import { createContext, useContext, ReactNode, useEffect, useRef } from 'react';
 import { useSocket } from '@/hooks/useSocket';
 import { io, Socket } from 'socket.io-client';
+import { getToken } from '@/lib/auth';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -15,7 +16,9 @@ export function SocketProvider({ children, tenantId }: { children: ReactNode; te
 
   useEffect(() => {
     if (!tenantId) return;
+    const token = getToken();
     const locSocket = io(`${SOCKET_URL}/location`, {
+      auth: { token },
       query: { tenantId },
       transports: ['websocket', 'polling'],
     });

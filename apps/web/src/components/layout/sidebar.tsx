@@ -3,70 +3,81 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import {
   LayoutDashboard,
+  Calendar,
   CalendarCheck,
   Users,
-  Wrench,
-  Calendar,
-  FileText,
-  Bell,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  LogOut,
-  Building2,
-  BarChart3,
+  Briefcase,
   Truck,
-  Bot,
+  Receipt,
   CreditCard,
   Package,
   Megaphone,
-  Sun,
-  Moon,
-  Percent,
-  AlertCircle,
-  Key,
-  DollarSign,
+  AlertTriangle,
+  Star,
   Smile,
-  GitFork,
-  ShieldAlert,
+  BarChart3,
+  Bell,
+  Settings,
+  Bot,
+  Shield,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  MessageSquare,
+  MessageCircle,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { Button } from '@/components/ui/button'
 
-const navItems = [
+type NavItem = {
+  href: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  badgeKey?: 'escalations' | 'disputes'
+}
+
+const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/bookings', label: 'Bookings', icon: CalendarCheck },
   { href: '/customers', label: 'Customers', icon: Users },
-  { href: '/services', label: 'Services', icon: Wrench },
-  { href: '/calendar', label: 'Calendar', icon: Calendar },
-  { href: '/invoices', label: 'Invoices', icon: FileText },
-  { href: '/split-payments', label: 'Split Payments', icon: Percent },
-  { href: '/settlements', label: 'Settlements', icon: DollarSign },
+  { href: '/services', label: 'Services', icon: Briefcase },
   { href: '/dispatches', label: 'Dispatches', icon: Truck },
-  { href: '/notifications', label: 'Notifications', icon: Bell },
+  { href: '/invoices', label: 'Invoices', icon: Receipt },
+  { href: '/payments', label: 'Payments', icon: CreditCard },
   { href: '/inventory', label: 'Inventory', icon: Package },
+  { href: '/marketing', label: 'Marketing', icon: Megaphone },
+  { href: '/disputes', label: 'Disputes', icon: AlertTriangle, badgeKey: 'disputes' },
+  { href: '/reviews', label: 'Reviews', icon: Star },
   { href: '/satisfaction', label: 'Satisfaction', icon: Smile },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
-  { href: '/ai/history', label: 'AI History', icon: Bot },
-  { href: '/ai/flows', label: 'Flow Builder', icon: GitFork },
-  { href: '/ai/escalations', label: 'Escalations', icon: AlertCircle },
-  { href: '/disputes', label: 'Disputes', icon: ShieldAlert },
-  { href: '/marketing', label: 'Marketing', icon: Megaphone },
-  { href: '/settings/subscription', label: 'Subscription', icon: CreditCard },
-  { href: '/settings/api-keys', label: 'API Keys', icon: Key },
+  { href: '/notifications', label: 'Notifications', icon: Bell },
+  { href: '/notifications/bulk-sms', label: 'Bulk SMS', icon: MessageSquare },
   { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/ai-agent', label: 'AI Agent', icon: Bot },
+  { href: '/ai/feedback', label: 'AI Feedback', icon: MessageCircle },
 ]
 
-export function Sidebar() {
+const adminItems: NavItem[] = [
+  { href: '/admin', label: 'Platform Admin', icon: Shield },
+  { href: '/admin/subscriptions', label: 'Subscriptions', icon: CreditCard },
+]
+
+interface SidebarProps {
+  collapsed: boolean
+  onToggle: () => void
+  open: boolean
+  onClose: () => void
+}
+
+export function Sidebar({ collapsed, onToggle, open, onClose }: SidebarProps) {
   const pathname = usePathname()
-  const { user, logout } = useAuth()
-  const [collapsed, setCollapsed] = React.useState(false)
-  const [dark, setDark] = React.useState(false)
+  const { user } = useAuth()
 
   const { data: escalationCount } = useQuery({
     queryKey: ['escalation-count'],
@@ -96,121 +107,230 @@ export function Sidebar() {
     enabled: !!user && ['ADMIN', 'MANAGER', 'OWNER'].includes(user.role),
   })
 
-  React.useEffect(() => {
-    const isDark = document.documentElement.classList.contains('dark')
-    setDark(isDark)
-  }, [])
-
-  const toggleTheme = () => {
-    const next = !dark
-    setDark(next)
-    document.documentElement.classList.toggle('dark', next)
-    localStorage.setItem('theme', next ? 'dark' : 'light')
+  const getBadgeCount = (item: NavItem): number => {
+    if (item.badgeKey === 'escalations') return escalationCount ?? 0
+    if (item.badgeKey === 'disputes') return disputeOpenCount ?? 0
+    return 0
   }
+
+  const sidebarContent = (
+    <div className="flex h-full flex-col bg-[#0F172A]">
+      <div className={cn(
+        'flex h-16 items-center border-b border-white/[0.06]',
+        collapsed ? 'justify-center px-3' : 'px-5'
+      )}>
+        <div className="flex items-center gap-3 overflow-hidden">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 28 28"
+            fill="none"
+            className="shrink-0"
+          >
+            <rect width="28" height="28" rx="8" fill="#4F46E5" />
+            <path
+              d="M7 10h14M7 14h10M7 18h6"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+          <motion.span
+            initial={false}
+            animate={{
+              opacity: collapsed ? 0 : 1,
+              width: collapsed ? 0 : 'auto',
+            }}
+            transition={{ duration: 0.2 }}
+            className="text-white font-semibold text-base whitespace-nowrap overflow-hidden"
+          >
+            BookerMap
+          </motion.span>
+        </div>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        {navItems.map((item) => {
+          const Icon = item.icon
+          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
+          const badgeCount = getBadgeCount(item)
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onClose}
+              className={cn(
+                'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                isActive
+                  ? 'bg-indigo-600/20 text-white'
+                  : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200'
+              )}
+              title={collapsed ? item.label : undefined}
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="sidebar-active"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full bg-[#4F46E5]"
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                />
+              )}
+              <div className="relative shrink-0">
+                <Icon className="h-5 w-5" />
+                {badgeCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] flex items-center justify-center px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                  </span>
+                )}
+              </div>
+              <motion.span
+                initial={false}
+                animate={{
+                  opacity: collapsed ? 0 : 1,
+                  width: collapsed ? 0 : 'auto',
+                }}
+                transition={{ duration: 0.2 }}
+                className="whitespace-nowrap overflow-hidden"
+              >
+                {item.label}
+              </motion.span>
+              {badgeCount > 0 && !collapsed && (
+                <span className="ml-auto h-5 min-w-[20px] flex items-center justify-center px-1.5 text-[10px] font-semibold text-white bg-red-500/90 rounded-full">
+                  {badgeCount > 99 ? '99+' : badgeCount}
+                </span>
+              )}
+            </Link>
+          )
+        })}
+
+        {user && user.role === 'ADMIN' && (
+          <>
+            <div className="pt-3 pb-1 px-3">
+              <motion.span
+                initial={false}
+                animate={{
+                  opacity: collapsed ? 0 : 1,
+                  height: collapsed ? 0 : 'auto',
+                }}
+                transition={{ duration: 0.2 }}
+                className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest whitespace-nowrap overflow-hidden block"
+              >
+                Platform Admin
+              </motion.span>
+            </div>
+            {adminItems.map((item) => {
+              const Icon = item.icon
+              const isActive = pathname === item.href || pathname.startsWith(item.href)
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onClose}
+                  className={cn(
+                    'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                    isActive
+                      ? 'bg-amber-500/20 text-amber-300'
+                      : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200'
+                  )}
+                  title={collapsed ? item.label : undefined}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="sidebar-active-admin"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full bg-amber-500"
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    />
+                  )}
+                  <Icon className="h-5 w-5 shrink-0" />
+                  <motion.span
+                    initial={false}
+                    animate={{
+                      opacity: collapsed ? 0 : 1,
+                      width: collapsed ? 0 : 'auto',
+                    }}
+                    transition={{ duration: 0.2 }}
+                    className="whitespace-nowrap overflow-hidden"
+                  >
+                    {item.label}
+                  </motion.span>
+                </Link>
+              )
+            })}
+          </>
+        )}
+      </nav>
+
+      <div className="shrink-0 border-t border-white/[0.06]">
+        <button
+          onClick={onToggle}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-3 text-sm text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200 transition-colors',
+            collapsed ? 'justify-center' : ''
+          )}
+        >
+          <div className="shrink-0">
+            {collapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+          </div>
+          <motion.span
+            initial={false}
+            animate={{
+              opacity: collapsed ? 0 : 1,
+              width: collapsed ? 0 : 'auto',
+            }}
+            transition={{ duration: 0.2 }}
+            className="whitespace-nowrap overflow-hidden text-xs"
+          >
+            Collapse menu
+          </motion.span>
+        </button>
+      </div>
+    </div>
+  )
 
   return (
     <>
-      <aside
+      <motion.aside
+        initial={false}
+        animate={{ width: collapsed ? 72 : 260 }}
+        transition={{ duration: 0.25, ease: 'easeInOut' }}
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300',
-          collapsed ? 'w-16' : 'w-60'
+          'hidden md:block fixed inset-y-0 left-0 z-40 overflow-hidden',
         )}
       >
-        <div className="flex h-14 items-center border-b border-gray-200 dark:border-gray-800 px-4">
-          <Building2 className="h-6 w-6 text-blue-600 shrink-0" />
-          {!collapsed && (
-            <span className="ml-3 font-bold text-lg text-gray-900 dark:text-white truncate">
-              BookerMap
-            </span>
-          )}
-        </div>
+        {sidebarContent}
+      </motion.aside>
 
-        <nav className="flex-1 overflow-y-auto p-2 space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname.startsWith(item.href)
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
-                )}
-                title={collapsed ? item.label : undefined}
-              >
-                <div className="relative">
-                  <Icon className="h-5 w-5 shrink-0" />
-                  {item.href === '/ai/escalations' && escalationCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] flex items-center justify-center px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
-                      {escalationCount > 99 ? '99+' : escalationCount}
-                    </span>
-                  )}
-                </div>
-                {!collapsed && (
-                  <span className="flex items-center gap-2">
-                    <span>{item.label}</span>
-                  {item.href === '/disputes' && disputeOpenCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] flex items-center justify-center px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
-                      {disputeOpenCount > 99 ? '99+' : disputeOpenCount}
-                    </span>
-                  )}
-                    {item.href === '/disputes' && disputeOpenCount > 0 && (
-                      <span className="h-5 min-w-[20px] flex items-center justify-center px-1.5 text-[10px] font-bold text-white bg-red-500 rounded-full">
-                        {disputeOpenCount > 99 ? '99+' : disputeOpenCount}
-                      </span>
-                    )}
-                    {item.href === '/ai/escalations' && escalationCount > 0 && (
-                      <span className="h-5 min-w-[20px] flex items-center justify-center px-1.5 text-[10px] font-bold text-white bg-red-500 rounded-full">
-                        {escalationCount > 99 ? '99+' : escalationCount}
-                      </span>
-                    )}
-                  </span>
-                )}
-              </Link>
-            )
-          })}
-        </nav>
-
-        <div className="border-t border-gray-200 dark:border-gray-800 p-3">
-          {!collapsed && user && (
-            <div className="mb-2 px-2 text-xs text-gray-500 dark:text-gray-400 truncate">
-              {user.firstName} {user.lastName}
-            </div>
-          )}
-          <Button
-            variant="ghost"
-            size={collapsed ? 'icon' : 'default'}
-            className="w-full justify-start gap-3 text-gray-600 dark:text-gray-400"
-            onClick={toggleTheme}
-          >
-            {dark ? <Sun className="h-5 w-5 shrink-0" /> : <Moon className="h-5 w-5 shrink-0" />}
-            {!collapsed && <span>{dark ? 'Light' : 'Dark'} mode</span>}
-          </Button>
-          <Button
-            variant="ghost"
-            size={collapsed ? 'icon' : 'default'}
-            className="w-full justify-start gap-3 text-gray-600 dark:text-gray-400"
-            onClick={logout}
-          >
-            <LogOut className="h-5 w-5 shrink-0" />
-            {!collapsed && <span>Logout</span>}
-          </Button>
-        </div>
-
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="absolute -right-3 top-20 h-6 w-6 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center justify-center shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-        >
-          {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
-        </button>
-      </aside>
-
-      {collapsed && (
-        <div className="w-16 shrink-0" />
-      )}
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-40 bg-black/50 md:hidden"
+              onClick={onClose}
+            />
+            <motion.div
+              initial={{ x: -260 }}
+              animate={{ x: 0 }}
+              exit={{ x: -260 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="fixed inset-y-0 left-0 z-50 w-[260px] md:hidden"
+            >
+              <div className="absolute top-4 right-4">
+                <button
+                  onClick={onClose}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              {sidebarContent}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   )
 }

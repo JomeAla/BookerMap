@@ -12,6 +12,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { CreatePlatformUserDto } from './dto/create-platform-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateAvailabilityDto } from './dto/update-availability.dto';
 import { UpdateSkillsDto } from './dto/update-skills.dto';
@@ -51,6 +52,14 @@ export class UserController {
   @ApiResponse({ status: 403, description: 'Forbidden - requires admin role' })
   invite(@CurrentUser() user: any, @Body() dto: CreateUserDto) {
     return this.userService.create(user.tenantId, dto);
+  }
+
+  @Post('platform')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Create platform user', description: 'Create a user in any tenant (Platform Admin only)' })
+  @ApiResponse({ status: 201, description: 'User created' })
+  createPlatformUser(@Body() dto: CreatePlatformUserDto) {
+    return this.userService.createPlatformUser(dto as any);
   }
 
   @Patch(':id')

@@ -53,6 +53,49 @@ export class UserService {
     });
   }
 
+  async createPlatformUser(dto: CreateUserDto & { tenantId: string }) {
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (existing) {
+      throw new ConflictException('Email already in use');
+    }
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: dto.tenantId },
+    });
+    if (!tenant) {
+      throw new NotFoundException(`Tenant not found`);
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+
+    return this.prisma.user.create({
+      data: {
+        email: dto.email,
+        passwordHash,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        phone: dto.phone,
+        role: dto.role,
+        tenantId: dto.tenantId,
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        role: true,
+        tenantId: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
   async findAll(tenantId: string) {
     return this.prisma.user.findMany({
       where: { tenantId },
