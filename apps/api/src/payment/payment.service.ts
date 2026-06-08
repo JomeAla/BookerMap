@@ -54,9 +54,12 @@ export class PaymentService {
     metadata: any,
     tenantId: string,
     providerName?: 'PAYSTACK' | 'FLUTTERWAVE',
+    currency?: string,
   ) {
     const { provider, providerName: resolvedProvider } = await this.getProviderForTenant(tenantId, providerName);
-    return provider.initializePayment(email, amount, { ...metadata, provider: resolvedProvider }, tenantId);
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    const resolvedCurrency = currency || tenant?.currency || 'NGN';
+    return provider.initializePayment(email, amount, { ...metadata, provider: resolvedProvider, currency: resolvedCurrency }, tenantId);
   }
 
   async verifyPayment(reference: string, tenantId: string) {
@@ -193,6 +196,8 @@ export class PaymentService {
 
   async initiatePOSPayment(tenantId: string, data: { amount: number; terminalId?: string; provider: string; invoiceId?: string; bookingId?: string }) {
     const reference = `BMR-POS-${tenantId.slice(0, 6)}-${Date.now()}`.toUpperCase();
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    const currency = tenant?.currency || 'NGN';
 
     if (data.provider === 'paystack') {
       const result = await this.paystackService.initializeTerminalTransaction(
@@ -204,7 +209,7 @@ export class PaymentService {
       return { reference: result.reference, timeout: result.timeout };
     }
 
-    const result = await this.flutterwaveService.initiatePOSCharge(data.amount, 'pos@bookermap.com', 'NGN', tenantId);
+    const result = await this.flutterwaveService.initiatePOSCharge(data.amount, 'pos@bookermap.com', currency, tenantId);
     return { reference: result.reference, note: result.note };
   }
 

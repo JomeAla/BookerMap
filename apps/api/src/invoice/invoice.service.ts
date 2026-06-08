@@ -36,6 +36,9 @@ export class InvoiceService {
 
     const invoiceNumber = await this.generateInvoiceNumber(tenantId);
 
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    const currency = dto.currency || tenant?.currency || 'NGN';
+
     const invoice = await this.prisma.invoice.create({
       data: {
         invoiceNumber,
@@ -50,6 +53,7 @@ export class InvoiceService {
         total,
         notes: dto.notes,
         status: 'DRAFT',
+        currency,
         lineItems: { create: lineItems },
       },
       include: { lineItems: true, customer: true, booking: true },

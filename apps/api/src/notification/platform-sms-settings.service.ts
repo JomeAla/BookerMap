@@ -171,7 +171,7 @@ async updateSmsSettings(data: {
     try {
       const client = new NigeriaBulkSMSClient({ username, password });
       const balance = await client.data.getBalance();
-      return { success: true, message: `Connected! Account balance: ${balance.balance} ${balance.currency || 'units'}` };
+      return { success: true, message: `Connected! Account balance: ${balance.balance ?? 0} ${(balance.data as any)?.currency || 'units'}` };
     } catch (e: any) {
       return { success: false, message: `Connection failed: ${e.message || 'Unknown error'}` };
     }

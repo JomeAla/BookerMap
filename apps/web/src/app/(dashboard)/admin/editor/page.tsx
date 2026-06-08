@@ -33,7 +33,7 @@ export default function AdminEditorPage() {
 
   const handleSave = () => {
     localStorage.setItem('bm_homepage_content', JSON.stringify(content))
-    toast({ title: 'Homepage content saved', variant: 'success' })
+    toast('Homepage content saved', 'success')
   }
 
   const fields = [

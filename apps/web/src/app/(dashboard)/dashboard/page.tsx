@@ -8,7 +8,7 @@ import { api } from '@/lib/api'
 import { Card, CardContent } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/badge'
 import { CardSkeleton, TableSkeleton } from '@/components/ui/skeleton'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, getCurrencySymbol } from '@/lib/utils'
 import {
   CalendarCheck,
   DollarSign,
@@ -20,6 +20,7 @@ import {
   Bot,
 } from 'lucide-react'
 import type { Booking } from '@/types'
+import { useTenantCurrency } from '@/hooks/useTenantCurrency'
 
 const container = {
   hidden: { opacity: 0 },
@@ -31,7 +32,7 @@ const container = {
 
 const item = {
   hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 120, damping: 18 } },
+  show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 120, damping: 18 } },
 }
 
 function getUserName() {
@@ -43,7 +44,7 @@ function getUserName() {
   }
 }
 
-function RevenueChart({ data }: { data?: { date: string; revenue: number }[] }) {
+function RevenueChart({ data, currency }: { data?: { date: string; revenue: number }[]; currency: string }) {
   if (!data || data.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-6 text-center">
@@ -72,7 +73,7 @@ function RevenueChart({ data }: { data?: { date: string; revenue: number }[] }) 
               className="w-full rounded-t-md bg-accent/80 hover:bg-accent transition-colors cursor-pointer relative"
             >
               <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                {formatCurrency(v)}
+                {formatCurrency(v, currency)}
               </div>
             </motion.div>
             <span className="text-[10px] text-text-muted">{labels[i]}</span>
@@ -83,17 +84,18 @@ function RevenueChart({ data }: { data?: { date: string; revenue: number }[] }) 
   )
 }
 
-function buildInsights(stats: { todayBookings: number; revenue: number; totalCustomers: number; pendingInvoices: number } | undefined) {
+function buildInsights(stats: { todayBookings: number; revenue: number; totalCustomers: number; pendingInvoices: number } | undefined, currency: string) {
   if (!stats) return [{ icon: Bot as React.ComponentType<{ className?: string }>, text: 'Insights will appear as you get more data.' }]
   const list: { icon: React.ComponentType<{ className?: string }>; text: string }[] = []
   if (stats.todayBookings > 0) list.push({ icon: CalendarCheck, text: `You have ${stats.todayBookings} booking${stats.todayBookings > 1 ? 's' : ''} scheduled for today.` })
   if (stats.pendingInvoices > 0) list.push({ icon: FileText, text: `${stats.pendingInvoices} invoice${stats.pendingInvoices > 1 ? 's' : ''} awaiting payment.` })
-  if (stats.revenue > 0) list.push({ icon: DollarSign, text: `Total revenue so far is ${formatCurrency(stats.revenue)}.` })
+  if (stats.revenue > 0) list.push({ icon: DollarSign, text: `Total revenue so far is ${formatCurrency(stats.revenue, currency)}.` })
   if (stats.totalCustomers > 0) list.push({ icon: Users, text: `${stats.totalCustomers} customer${stats.totalCustomers > 1 ? 's' : ''} in your database.` })
   return list.length > 0 ? list : [{ icon: Bot as React.ComponentType<{ className?: string }>, text: 'Insights will appear as you get more data.' }]
 }
 
 export default function DashboardPage() {
+  const { currency } = useTenantCurrency()
   const firstName = getUserName()
   const [insightIndex, setInsightIndex] = React.useState(0)
 
@@ -142,11 +144,11 @@ export default function DashboardPage() {
     },
   })
 
-  const insights = buildInsights(stats)
+  const insights = buildInsights(stats, currency)
 
   const statCards = [
     { label: "Today's Bookings", value: stats?.todayBookings ?? 0, icon: CalendarCheck },
-    { label: 'Monthly Revenue', value: stats?.revenue ? formatCurrency(stats.revenue) : '\u20A60.00', icon: DollarSign },
+    { label: 'Monthly Revenue', value: stats?.revenue ? formatCurrency(stats.revenue, currency) : `${getCurrencySymbol(currency)}0.00`, icon: DollarSign },
     { label: 'Total Customers', value: stats?.totalCustomers ?? 0, icon: Users },
     { label: 'Pending Invoices', value: stats?.pendingInvoices ?? 0, icon: Clock },
   ]
@@ -312,7 +314,7 @@ export default function DashboardPage() {
                 </motion.div>
               </div>
               <div className="mt-5 space-y-3">
-                <RevenueChart data={revenueData?.data} />
+                <RevenueChart data={revenueData?.data} currency={currency} />
               </div>
             </CardContent>
           </Card>

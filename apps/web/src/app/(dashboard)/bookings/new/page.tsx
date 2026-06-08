@@ -12,6 +12,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { CalendarCheck, ArrowLeft, RotateCcw, Tag, CheckCircle2, XCircle } from 'lucide-react'
+import { getCurrencySymbol } from '@/lib/utils'
+import { useTenantCurrency } from '@/hooks/useTenantCurrency'
 import type { Customer, Service, User, Location as BizLocation } from '@/types'
 
 const DAYS_OF_WEEK = [
@@ -27,6 +29,7 @@ const DAYS_OF_WEEK = [
 export default function NewBookingPage() {
   const router = useRouter()
   const { addToast } = useToast()
+  const { currency } = useTenantCurrency()
   const [form, setForm] = React.useState({
     customerId: '',
     serviceId: '',
@@ -150,7 +153,7 @@ export default function NewBookingPage() {
               onChange={(e) => setForm({ ...form, serviceId: e.target.value })}
               options={[
                 { value: '', label: 'Select service...' },
-                ...(services?.map((s) => ({ value: s.id, label: `${s.name} (${s.duration}min - ₦${s.price})` })) || []),
+                ...(services?.map((s) => ({ value: s.id, label: `${s.name} (${s.duration}min - ${getCurrencySymbol(currency)}${s.price})` })) || []),
               ]}
               required
             />
@@ -216,7 +219,7 @@ export default function NewBookingPage() {
                         const { data } = await api.get('/coupons/validate', { params: { code: form.couponCode, amount } })
                         const result = data.data as any
                         setCouponStatus('valid')
-                        setCouponMessage(`Discount: ${result.discount > 0 ? `-${result.discount}` : '₦0'}`)
+                        setCouponMessage(`Discount: ${result.discount > 0 ? `-${result.discount}` : `${getCurrencySymbol(currency)}0`}`)
                         setForm(f => ({ ...f, couponDiscount: result.discount }))
                       } catch (err: any) {
                         setCouponStatus('invalid')

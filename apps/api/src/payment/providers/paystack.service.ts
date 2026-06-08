@@ -59,12 +59,14 @@ export class PaystackService implements PaymentProvider {
     tenantId: string,
   ): Promise<{ authorizationUrl: string; reference: string; accessCode?: string }> {
     const { secretKey } = await this.resolveCredentials(tenantId);
+    const currency = metadata?.currency || 'NGN';
     try {
       const response = await axios.post(
         `${this.baseUrl}/transaction/initialize`,
         {
           email,
           amount: Math.round(amount * 100),
+          currency,
           metadata: { ...metadata, tenantId },
         },
         { headers: this.getHeaders(secretKey) },
@@ -161,6 +163,8 @@ export class PaystackService implements PaymentProvider {
     tenantId: string,
   ): Promise<any> {
     const { secretKey } = await this.resolveCredentials(tenantId);
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    const currency = tenant?.currency || 'NGN';
     try {
       const response = await axios.post(
         `${this.baseUrl}/transferrecipient`,
@@ -169,7 +173,7 @@ export class PaystackService implements PaymentProvider {
           name,
           account_number: accountNumber,
           bank_code: bankCode,
-          currency: 'NGN',
+          currency,
         },
         { headers: this.getHeaders(secretKey) },
       );

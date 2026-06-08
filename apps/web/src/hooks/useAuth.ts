@@ -49,5 +49,15 @@ export function useAuth() {
     router.push('/login')
   }, [router])
 
-  return { user, loading, login, register, logout, isAuthenticated: !!user }
+  const forgotPassword = useCallback(async (email: string) => {
+    const res = await api.post('/auth/forgot-password', { email })
+    return res.data
+  }, [])
+
+  const resetPassword = useCallback(async (token: string, password: string) => {
+    const res = await api.post('/auth/reset-password', { token, password })
+    return res.data
+  }, [])
+
+  return { user, loading, login, register, logout, forgotPassword, resetPassword, isAuthenticated: !!user }
 }

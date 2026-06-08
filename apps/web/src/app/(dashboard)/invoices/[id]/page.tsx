@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/toast'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { useTenantCurrency } from '@/hooks/useTenantCurrency'
 import { ArrowLeft, User, Mail, Calendar, DollarSign, FileText, Send, CheckCircle, Ban, Download, RotateCcw, CreditCard } from 'lucide-react'
 import { Select } from '@/components/ui/select'
 import type { Invoice, Payment, SavedCard } from '@/types'
@@ -21,6 +22,7 @@ import type { Invoice, Payment, SavedCard } from '@/types'
 export default function InvoiceDetailPage() {
   const params = useParams()
   const id = params.id as string
+  const { currency: tenantCurrency } = useTenantCurrency()
   const queryClient = useQueryClient()
   const { addToast } = useToast()
 
@@ -31,6 +33,8 @@ export default function InvoiceDetailPage() {
       return data.data as Invoice
     },
   })
+
+  const fc = (amount: number) => formatCurrency(amount, invoice?.currency || tenantCurrency)
 
   const sendMutation = useMutation({
     mutationFn: async () => {
@@ -81,7 +85,7 @@ export default function InvoiceDetailPage() {
       return
     }
     if (amount > remainingBalance) {
-      addToast(`Amount cannot exceed remaining balance of ${formatCurrency(remainingBalance)}`, 'error')
+      addToast(`Amount cannot exceed remaining balance of ${fc(remainingBalance)}`, 'error')
       return
     }
     setPartialLoading(true)
@@ -263,7 +267,7 @@ export default function InvoiceDetailPage() {
             </div>
             <div className="flex items-center gap-3 text-sm">
               <DollarSign className="h-4 w-4 text-gray-400" />
-              <span className="font-semibold">{formatCurrency(invoice.total)}</span>
+              <span className="font-semibold">{fc(invoice.total)}</span>
             </div>
             {invoice.paidAt && (
               <div className="flex items-center gap-3 text-sm">
@@ -322,7 +326,7 @@ export default function InvoiceDetailPage() {
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Payment Progress</span>
               <span className="text-sm text-gray-500">
-                {formatCurrency(invoice.paidAmount || 0)} / {formatCurrency(invoice.total)}
+                {fc(invoice.paidAmount || 0)} / {fc(invoice.total)}
               </span>
             </div>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
@@ -333,10 +337,10 @@ export default function InvoiceDetailPage() {
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-green-600 dark:text-green-400 font-medium">
-                Paid: {formatCurrency(invoice.paidAmount || 0)}
+                Paid: {fc(invoice.paidAmount || 0)}
               </span>
               <span className="text-gray-500">
-                Remaining: {formatCurrency(remainingBalance)}
+                Remaining: {fc(remainingBalance)}
               </span>
             </div>
           </CardContent>
@@ -362,8 +366,8 @@ export default function InvoiceDetailPage() {
                 <TableRow key={item.id}>
                   <TableCell>{item.description}</TableCell>
                   <TableCell className="text-right">{item.quantity}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
-                  <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
+<TableCell className="text-right">{fc(item.unitPrice)}</TableCell>
+                      <TableCell className="text-right font-medium">{fc(item.total)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -375,23 +379,23 @@ export default function InvoiceDetailPage() {
         <div className="w-full max-w-sm space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-gray-500 dark:text-gray-400">Subtotal</span>
-            <span>{formatCurrency(invoice.subtotal)}</span>
+            <span>{fc(invoice.subtotal)}</span>
           </div>
           {invoice.discount > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-gray-500 dark:text-gray-400">Discount</span>
-              <span className="text-red-500">-{formatCurrency(invoice.discount)}</span>
+              <span className="text-red-500">-{fc(invoice.discount)}</span>
             </div>
           )}
           {invoice.tax > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-gray-500 dark:text-gray-400">Tax ({invoice.taxRate}%)</span>
-              <span>{formatCurrency(invoice.tax)}</span>
+              <span>{fc(invoice.tax)}</span>
             </div>
           )}
           <div className="flex justify-between font-bold text-lg pt-2 border-t border-gray-200 dark:border-gray-700">
             <span>Total</span>
-            <span>{formatCurrency(invoice.total)}</span>
+            <span>{fc(invoice.total)}</span>
           </div>
         </div>
       </div>
@@ -424,7 +428,7 @@ export default function InvoiceDetailPage() {
                 {invoice.payments.map((payment) => (
                   <TableRow key={payment.id}>
                     <TableCell className="text-sm">{formatDate(payment.createdAt, 'MMM d, yyyy')}</TableCell>
-                    <TableCell>{formatCurrency(payment.amount)}</TableCell>
+                    <TableCell>{fc(payment.amount)}</TableCell>
                     <TableCell className="text-sm">{payment.provider}</TableCell>
                     <TableCell className="text-sm font-mono">{payment.providerRef || '—'}</TableCell>
                     <TableCell><StatusBadge status={payment.status} /></TableCell>
@@ -451,7 +455,7 @@ export default function InvoiceDetailPage() {
           <DialogHeader><DialogTitle>POS Payment</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Amount: {formatCurrency(invoice?.total || 0)}
+              Amount: {fc(invoice?.total || 0)}
             </p>
             {!posReference ? (
               <Button className="w-full" onClick={handleGeneratePos} disabled={posLoading}>
@@ -489,7 +493,7 @@ export default function InvoiceDetailPage() {
           <DialogHeader><DialogTitle>Charge Saved Card</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Amount: {formatCurrency(invoice?.total || 0)}
+              Amount: {fc(invoice?.total || 0)}
             </p>
             {savedCards?.map((card) => (
               <div key={card.id} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
@@ -523,15 +527,15 @@ export default function InvoiceDetailPage() {
             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg space-y-1">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600 dark:text-gray-400">Invoice Total</span>
-                <span className="font-medium">{formatCurrency(invoice?.total || 0)}</span>
+                <span className="font-medium">{fc(invoice?.total || 0)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600 dark:text-gray-400">Already Paid</span>
-                <span className="font-medium text-green-600">{formatCurrency(invoice?.paidAmount || 0)}</span>
+                <span className="font-medium text-green-600">{fc(invoice?.paidAmount || 0)}</span>
               </div>
               <div className="flex justify-between text-sm font-semibold border-t border-blue-200 dark:border-blue-700 pt-1 mt-1">
                 <span>Remaining Balance</span>
-                <span>{formatCurrency(remainingBalance)}</span>
+                <span>{fc(remainingBalance)}</span>
               </div>
             </div>
             <Input
@@ -541,7 +545,7 @@ export default function InvoiceDetailPage() {
               onChange={(e) => setPartialAmount(e.target.value)}
               max={remainingBalance}
               min={1}
-              placeholder={`Max ${formatCurrency(remainingBalance)}`}
+              placeholder={`Max ${fc(remainingBalance)}`}
             />
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
@@ -559,7 +563,7 @@ export default function InvoiceDetailPage() {
                 Cancel
               </Button>
               <Button onClick={handlePartialPayment} disabled={partialLoading || !partialAmount || Number(partialAmount) <= 0}>
-                {partialLoading ? 'Processing...' : `Pay ${partialAmount ? formatCurrency(Number(partialAmount)) : ''}`}
+                {partialLoading ? 'Processing...' : `Pay ${partialAmount ? fc(Number(partialAmount)) : ''}`}
               </Button>
             </div>
           </div>
@@ -572,7 +576,7 @@ export default function InvoiceDetailPage() {
           <div className="space-y-4">
             {selectedPayment && (
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                Payment amount: <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(selectedPayment.amount)}</span>
+                Payment amount: <span className="font-semibold text-gray-900 dark:text-white">{fc(selectedPayment.amount)}</span>
               </div>
             )}
             <Input

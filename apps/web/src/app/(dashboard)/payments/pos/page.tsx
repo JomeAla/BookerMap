@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { formatCurrency, formatDate, timeAgo } from '@/lib/utils'
+import { useTenantCurrency } from '@/hooks/useTenantCurrency'
 import { CreditCard, Monitor, Receipt, DollarSign, RefreshCw } from 'lucide-react'
 import type { Terminal, Payment } from '@/types'
 
@@ -21,6 +22,7 @@ interface PosPayment extends Payment {
 }
 
 export default function PosPaymentPage() {
+  const { currency } = useTenantCurrency()
   const queryClient = useQueryClient()
   const { addToast } = useToast()
   const [dialogOpen, setDialogOpen] = React.useState(false)
@@ -180,7 +182,7 @@ export default function PosPaymentPage() {
             </div>
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">Today's Volume</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(todayVolume)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(todayVolume, currency)}</p>
             </div>
           </CardContent>
         </Card>
@@ -255,7 +257,7 @@ export default function PosPaymentPage() {
                       {formatDate(tx.createdAt, 'MMM d, h:mm a')}
                     </TableCell>
                     <TableCell className="font-medium">
-                      {formatCurrency(tx.amount)}
+                      {formatCurrency(tx.amount, tx.currency || currency)}
                     </TableCell>
                     <TableCell className="text-sm text-gray-500">
                       {tx.providerRef?.includes('TML') ? 'Terminal' : tx.provider}

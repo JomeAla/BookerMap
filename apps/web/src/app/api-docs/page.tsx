@@ -4,7 +4,7 @@ import * as React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { BookOpen, Lock, Key, Shield, Server, Users, Calendar, CreditCard, Bot, Bell, Globe, BarChart3, Copy, Check } from 'lucide-react'
+import { BookOpen, Lock, Key, Shield, Server, Users, Calendar, CreditCard, Bot, Bell, Globe, BarChart3, Copy, Check, Star } from 'lucide-react'
 
 interface Endpoint {
   method: string
@@ -601,7 +601,7 @@ const modules: ApiModule[] = [
           { name: 'response', type: 'string', required: true, description: 'Response text' },
           { name: 'language', type: 'string', required: false, description: 'Language code' },
         ],
-        request: `{ "trigger": "pricing", "response": "Our prices start at ₦5,000..." }`,
+        request: `{ "trigger": "pricing", "response": "Our prices start at 5,000..." }`,
         response: `{ "success": true, "data": { "id": "clx...", "trigger": "pricing", "response": "..." } }`,
       },
       {

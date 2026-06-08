@@ -13,7 +13,8 @@ import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { formatDate } from '@/lib/utils'
 import { Star, MessageSquare, ThumbsUp, ThumbsDown, CheckCircle, AlertTriangle } from 'lucide-react'
-import type { Review, ReviewStatus } from '@/types'
+import type { Review } from '@/types'
+import { ReviewStatus } from '@/types'
 
 const statusTabs: { value: string; label: string }[] = [
   { value: '', label: 'All' },

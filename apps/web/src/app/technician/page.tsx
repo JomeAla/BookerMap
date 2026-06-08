@@ -16,10 +16,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useLocationSocket } from '@/components/providers/socket-provider'
 import { useAuth } from '@/hooks/useAuth'
 
-const statusActions: { status: JobStatus; label: string; icon: React.ReactNode; variant?: 'default' | 'outline' | 'destructive' }[] = [
+const statusActions: { status: JobStatus; label: string; icon: React.ReactNode; variant?: 'primary' | 'outline' | 'destructive' }[] = [
   { status: JobStatus.EN_ROUTE, label: 'En Route', icon: <Navigation className="h-4 w-4" /> },
   { status: JobStatus.STARTED, label: 'Start Job', icon: <Play className="h-4 w-4" /> },
-  { status: JobStatus.COMPLETED, label: 'Complete', icon: <CheckCircle className="h-4 w-4" />, variant: 'default' },
+  { status: JobStatus.COMPLETED, label: 'Complete', icon: <CheckCircle className="h-4 w-4" />, variant: 'primary' },
   { status: JobStatus.CANCELLED, label: 'Cancel', icon: <XCircle className="h-4 w-4" />, variant: 'destructive' },
 ]
 

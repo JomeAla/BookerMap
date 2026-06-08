@@ -39,7 +39,7 @@ function StarRating({ messageId, rating, onRate }: { messageId?: string; rating?
         >
           <Star
             className={`h-3.5 w-3.5 transition-colors ${
-              (hovered ?? current) >= star
+              ((hovered ?? current) ?? 0) >= star
                 ? 'fill-amber-400 text-amber-400'
                 : 'text-gray-300 dark:text-gray-600 hover:text-amber-300'
             }`}

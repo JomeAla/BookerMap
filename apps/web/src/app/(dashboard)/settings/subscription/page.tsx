@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import { useTenantCurrency } from '@/hooks/useTenantCurrency'
 import { CreditCard, AlertCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 
 const PLAN_PRICES: Record<string, { monthly: number; yearly: number }> = {
@@ -55,6 +56,7 @@ function ConfirmDialog({ open, title, message, onConfirm, onCancel, loading }: a
 
 export default function SubscriptionSettingsPage() {
   const { addToast } = useToast()
+  const { currency } = useTenantCurrency()
   const queryClient = useQueryClient()
   const [showCancelDialog, setShowCancelDialog] = React.useState(false)
   const [showChangePlan, setShowChangePlan] = React.useState(false)
@@ -150,7 +152,7 @@ export default function SubscriptionSettingsPage() {
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">Price</p>
                   <p className="font-semibold text-gray-900 dark:text-white">
-                    {formatCurrency(subscription.price / 100, 'NGN')}/{subscription.billingCycle?.toLowerCase() === 'yearly' ? 'yr' : 'mo'}
+                    {formatCurrency(subscription.price / 100, currency)}/{subscription.billingCycle?.toLowerCase() === 'yearly' ? 'yr' : 'mo'}
                   </p>
                 </div>
                 <div>
@@ -187,14 +189,14 @@ export default function SubscriptionSettingsPage() {
             <div className="space-y-4">
               <div className="flex gap-2">
                 <Button
-                  variant={selectedCycle === 'MONTHLY' ? 'default' : 'outline'}
+                  variant={selectedCycle === 'MONTHLY' ? 'primary' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedCycle('MONTHLY')}
                 >
                   Monthly
                 </Button>
                 <Button
-                  variant={selectedCycle === 'YEARLY' ? 'default' : 'outline'}
+                  variant={selectedCycle === 'YEARLY' ? 'primary' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedCycle('YEARLY')}
                 >
@@ -219,7 +221,7 @@ export default function SubscriptionSettingsPage() {
                     >
                       <p className="font-semibold text-gray-900 dark:text-white">{PLAN_LABELS[planKey]}</p>
                       <p className="text-lg font-bold text-gray-900 dark:text-white mt-1">
-                        {formatCurrency(price / 100, 'NGN')}
+                        {formatCurrency(price / 100, currency)}
                       </p>
                       <p className="text-xs text-gray-500">
                         /{selectedCycle === 'MONTHLY' ? 'month' : 'year'}

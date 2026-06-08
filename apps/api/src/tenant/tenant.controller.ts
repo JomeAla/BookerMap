@@ -21,6 +21,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CURRENCIES } from '../common/utils/currency';
 
 @ApiTags('Tenants')
 @Controller('tenants')
@@ -49,6 +50,22 @@ export class TenantController {
       page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 20,
     );
+  }
+
+  @Get('currency-config')
+  @ApiOperation({ summary: 'Get supported currencies', description: 'Returns all supported currencies with symbols and locale info' })
+  @ApiResponse({ status: 200, description: 'Currency configuration' })
+  getCurrencyConfig() {
+    return {
+      success: true,
+      data: Object.entries(CURRENCIES).map(([code, info]) => ({
+        code,
+        symbol: info.symbol,
+        name: info.name,
+        decimals: info.decimals,
+        locale: info.locale,
+      })),
+    };
   }
 
   @Get('slug/:slug')

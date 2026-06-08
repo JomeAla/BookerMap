@@ -4,6 +4,7 @@ import { NotificationType } from '@prisma/client';
 import { NotificationFilterDto } from './dto/notification-filter.dto';
 import { BookingGateway } from '../gateway/booking.gateway';
 import { WebPushService } from './web-push.service';
+import { MobilePushService } from './mobile-push.service';
 
 @Injectable()
 export class NotificationService {
@@ -13,6 +14,7 @@ export class NotificationService {
     private prisma: PrismaService,
     private bookingGateway: BookingGateway,
     private webPushService: WebPushService,
+    private mobilePushService: MobilePushService,
   ) {}
 
    async sendEmail(tenantId: string, recipient: string, subject: string, body: string, html?: string) {
@@ -44,15 +46,22 @@ export class NotificationService {
       data: { userId },
     });
 
-    const result = await this.webPushService.send(userId, { title, body });
-    if (result.sent > 0) {
+    const webResult = await this.webPushService.send(userId, { title, body });
+
+    const deviceTokens = await this.mobilePushService.getUserDeviceTokens(userId);
+    let mobileResult = { success: false, failureCount: 0 };
+    if (deviceTokens.length > 0) {
+      mobileResult = await this.mobilePushService.sendToTokens(deviceTokens, { title, body });
+    }
+
+    if (webResult.sent > 0 || mobileResult.success) {
       await this.prisma.notification.update({
         where: { id: notification.id },
         data: { sentAt: new Date(), status: 'SENT' },
       });
     }
 
-    return { notification, pushResult: result };
+    return { notification, webResult, mobileResult };
   }
 
   async sendInApp(tenantId: string, userId: string, title: string, body: string) {
@@ -170,5 +179,26 @@ export class NotificationService {
       },
     });
     return { count };
+  }
+
+  async updateDeliveryStatus(
+    notificationId: string,
+    status: string,
+    providerMessageId?: string | null,
+    failureReason?: string | null,
+  ) {
+    const notification = await this.prisma.notification.findUnique({ where: { id: notificationId } });
+    if (!notification) {
+      this.logger.warn(`Notification ${notificationId} not found for delivery status update`);
+      return null;
+    }
+
+    return this.prisma.notification.update({
+      where: { id: notificationId },
+      data: {
+        status: status === 'delivered' ? 'SENT' : status === 'failed' ? 'FAILED' : status.toUpperCase(),
+        ...(providerMessageId ? { recipient: notification.recipient } : {}),
+      },
+    });
   }
 }

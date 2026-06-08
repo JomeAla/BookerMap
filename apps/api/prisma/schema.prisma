@@ -163,6 +163,9 @@ model Tenant {
   subscription      Subscription?
   conversationFlows ConversationFlow[]
   bulkSmsCampaigns  BulkSmsCampaign[]
+  smsCredit         SmsCredit?
+  smsCreditTransactions SmsCreditTransaction[]
+  satisfactionSurveys    SatisfactionSurvey[]
 
   @@map("tenants")
 }
@@ -247,6 +250,7 @@ model User {
   commissionRate      Float?
   commissionType      String?              @default("PERCENTAGE")
   splitPayments       SplitPayment[]       @relation("SplitPaymentProvider")
+  mobileDevices       MobileDevice[]
   settlements         Settlement[]
   escalations         Escalation[]         @relation("EscalatedCustomer")
   assignedEscalations Escalation[]         @relation("EscalatedAgent")
@@ -255,6 +259,7 @@ model User {
   resolvedDisputes    Dispute[]            @relation("Resolver")
   disputeEvidence     DisputeEvidence[]
   bulkSmsCampaigns    BulkSmsCampaign[]
+  grantedCreditTransactions SmsCreditTransaction[]
 
   @@unique([tenantId, email])
   @@map("users")
@@ -323,6 +328,8 @@ model Service {
   tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   categoryId String?
   category   ServiceCategory? @relation(fields: [categoryId], references: [id])
+  locationId String?
+  location   Location?        @relation(fields: [locationId], references: [id])
 
   modifiers         ServiceModifier[]
   intakeFields      IntakeField[]
@@ -455,6 +462,7 @@ model Location {
   bookings  Booking[]
   users     User[]
   customers Customer[]
+  services  Service[]
 
   @@unique([tenantId, name])
   @@map("locations")
@@ -555,6 +563,7 @@ model Invoice {
   dueDate       DateTime
   paidAt        DateTime?
   notes         String?
+  currency      String        @default("NGN")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -1126,6 +1135,7 @@ model Escalation {
 model SatisfactionSurvey {
   id          String   @id @default(cuid())
   tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bookingId   String?
   booking     Booking? @relation(fields: [bookingId], references: [id])
   customerId  String
@@ -1133,10 +1143,12 @@ model SatisfactionSurvey {
   touchpoint  String // BOOKING_CREATED, SERVICE_COMPLETED, PAYMENT_MADE, GENERAL
   score       Int // 1-5 for CSAT, 0-10 for NPS
   scoreType   String   @default("CSAT") // CSAT, NPS, CES
-  feedback    String? // open text feedback
-  category    String? // cleanliness, punctuality, quality, communication, value
-  respondedAt DateTime @default(now())
-  createdAt   DateTime @default(now())
+  feedback       String?  // open text feedback
+  category       String?  // cleanliness, punctuality, quality, communication, value
+  sentimentScore Float?   // rule-based sentiment score (-1 to 1)
+  sentimentLabel String?  // positive, neutral, negative
+  respondedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
 
   @@index([tenantId])
   @@index([customerId])
@@ -1299,4 +1311,94 @@ model BulkSmsRecipient {
 
   @@index([campaignId])
   @@map("bulk_sms_recipients")
+}
+
+model MobileDevice {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token       String   @unique
+  platform    String
+  deviceId    String?
+  appVersion  String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([platform])
+  @@map("mobile_devices")
+}
+
+model PlatformSmsSettings {
+  id                        String   @id @default(cuid())
+  smsProvider               String   @default("nigeria_bulk_sms")
+  smsApiUsername            String?
+  smsApiKey                 String?  // encrypted
+  smsApiSenderId            String   @default("BookerMap")
+  smsShortCode              String?
+  smsWebhookPath            String   @default("/api/v1/sms/delivery")
+  smsPricePerUnit           Float    @default(1.0)
+  whatsappProvider          String   @default("meta")
+  whatsappAccessToken       String?  // encrypted
+  whatsappPhoneNumberId     String?
+  whatsappBusinessId        String?
+  whatsappWebhookPath       String   @default("/api/v1/notifications/whatsapp/webhook")
+  whatsappWebhookVerifyToken String? // encrypted
+  whatsappPricePerUnit      Float    @default(1.5)
+  isActive                  Boolean  @default(true)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@map("platform_sms_settings")
+}
+
+model SmsCredit {
+  id             String   @id @default(cuid())
+  tenantId       String   @unique
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  balance        Float    @default(0)
+  totalPurchased Float    @default(0)
+  totalUsed      Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  transactions SmsCreditTransaction[]
+
+  @@map("sms_credits")
+}
+
+model SmsCreditTransaction {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creditId    String?
+  credit      SmsCredit? @relation(fields: [creditId], references: [id], onDelete: SetNull)
+  amount      Float
+  balanceAfter Float
+  type        String   // GRANT, SMS_DEDUCT, WHATSAPP_DEDUCT, ADJUSTMENT
+  description String?
+  grantedById String?
+  grantedBy   User?    @relation(fields: [grantedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([type])
+  @@map("sms_credit_transactions")
+}
+
+model PlanPricing {
+  id              String        @id @default(cuid())
+  plan            SubscriptionPlan
+  billingCycle    BillingCycle
+  price           Float
+  smsCredits      Int           @default(0)
+  whatsappCredits Int           @default(0)
+  features        Json?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([plan, billingCycle])
+  @@map("plan_pricing")
 }

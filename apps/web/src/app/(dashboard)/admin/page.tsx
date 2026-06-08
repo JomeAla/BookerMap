@@ -11,7 +11,8 @@ import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { formatDate, formatCurrency, getCurrencySymbol } from '@/lib/utils'
+import { useTenantCurrency } from '@/hooks/useTenantCurrency'
 import { useToast } from '@/components/ui/toast'
 import {
   Building2, Users, Plus, X, Trash2, Pause, Play, Tag, Search, Shield,
@@ -26,16 +27,16 @@ interface Tenant {
   _count: { users: number; bookings: number }
 }
 
-const DISPUTE_STATUS_VARIANT: Record<string, 'warning' | 'info' | 'success' | 'secondary'> = {
+const DISPUTE_STATUS_VARIANT: Record<string, 'warning' | 'outline' | 'success' | 'secondary'> = {
   OPEN: 'warning',
-  INVESTIGATING: 'info',
+  INVESTIGATING: 'outline',
   RESOLVED: 'success',
   CLOSED: 'secondary',
 }
 
-const SETTLEMENT_STATUS_VARIANT: Record<string, 'warning' | 'info' | 'success' | 'destructive'> = {
+const SETTLEMENT_STATUS_VARIANT: Record<string, 'warning' | 'outline' | 'success' | 'destructive'> = {
   PENDING: 'warning',
-  PROCESSING: 'info',
+  PROCESSING: 'outline',
   COMPLETED: 'success',
   FAILED: 'destructive',
 }
@@ -49,6 +50,7 @@ const SUB_STATUS_VARIANT: Record<string, 'success' | 'secondary' | 'destructive'
 }
 
 function PlanPricingForm({ onSubmit, isLoading }: { onSubmit: (dto: any) => void; isLoading: boolean }) {
+  const { currency } = useTenantCurrency()
   const [form, setForm] = React.useState({
     plan: 'BASIC', billingCycle: 'MONTHLY', price: 4999, smsCredits: 100, whatsappCredits: 50, features: '[]',
   })
@@ -71,7 +73,7 @@ function PlanPricingForm({ onSubmit, isLoading }: { onSubmit: (dto: any) => void
         </select>
       </div>
       <div>
-        <label className="text-sm font-medium mb-1 block">Price (NGN)</label>
+        <label className="text-sm font-medium mb-1 block">Price ({currency})</label>
         <Input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: parseInt(e.target.value) || 0 })} />
       </div>
       <div>
@@ -96,6 +98,7 @@ function PlanPricingForm({ onSubmit, isLoading }: { onSubmit: (dto: any) => void
 }
 
 export default function AdminPlatformPage() {
+  const { currency } = useTenantCurrency()
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [tab, setTab] = React.useState('tenants')
@@ -347,6 +350,12 @@ export default function AdminPlatformPage() {
   const [settingsTab, setSettingsTab] = React.useState('sms')
   const [planPricing, setPlanPricing] = React.useState<Array<{ id: string; plan: string; billingCycle: string; price: number; smsCredits: number; whatsappCredits: number; features: any; isActive: boolean }>>([])
 
+  const { data: platformSettings, isLoading: settingsLoading } = useQuery({
+    queryKey: ['platform-sms-settings'],
+    queryFn: async () => { const { data } = await api.get('/notifications/platform-settings'); return data },
+    enabled: tab === 'messaging',
+  })
+
   React.useEffect(() => {
     if (platformSettings?.data) {
       const s = platformSettings.data
@@ -367,12 +376,6 @@ export default function AdminPlatformPage() {
       }))
     }
   }, [platformSettings])
-
-  const { data: platformSettings, isLoading: settingsLoading } = useQuery({
-    queryKey: ['platform-sms-settings'],
-    queryFn: async () => { const { data } = await api.get('/notifications/platform-settings'); return data },
-    enabled: tab === 'messaging',
-  })
 
   const { data: creditBalance } = useQuery({
     queryKey: ['sms-credit-balance'],
@@ -481,9 +484,9 @@ export default function AdminPlatformPage() {
     onError: (err: any) => toast({ title: err?.response?.data?.message || 'Error resolving', variant: 'destructive' }),
   })
 
-  const ESC_STATUS_VARIANT: Record<string, 'warning' | 'info' | 'success' | 'secondary'> = {
+  const ESC_STATUS_VARIANT: Record<string, 'warning' | 'outline' | 'success' | 'secondary'> = {
     OPEN: 'warning',
-    ASSIGNED: 'info',
+    ASSIGNED: 'outline',
     RESOLVED: 'success',
     CLOSED: 'secondary',
   }
@@ -1293,7 +1296,7 @@ export default function AdminPlatformPage() {
                       <Badge variant={SUB_STATUS_VARIANT[sub.status] || 'secondary'}>{sub.status}</Badge>
                     </TableCell>
                     <TableCell className="capitalize">{sub.billingCycle?.toLowerCase()}</TableCell>
-                    <TableCell>{formatCurrency(sub.price / 100, 'NGN')}</TableCell>
+                    <TableCell>{formatCurrency(sub.price / 100, currency)}</TableCell>
                     <TableCell className="text-sm text-gray-500">{formatDate(sub.currentPeriodEnd, 'MMM d, yyyy')}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
@@ -1421,7 +1424,7 @@ export default function AdminPlatformPage() {
                     {subInvoices.map((inv: any) => (
                       <TableRow key={inv.id}>
                         <TableCell className="text-sm">{formatDate(inv.createdAt, 'MMM d, yyyy')}</TableCell>
-                        <TableCell className="text-sm font-medium">{formatCurrency(inv.amount / 100, inv.currency || 'NGN')}</TableCell>
+                        <TableCell className="text-sm font-medium">{formatCurrency(inv.amount / 100, inv.currency || currency)}</TableCell>
                         <TableCell>
                           <Badge variant={inv.status === 'PAID' ? 'success' : inv.status === 'PENDING' ? 'warning' : 'destructive'}>
                             {inv.status}
@@ -1484,12 +1487,12 @@ export default function AdminPlatformPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4 border-t pt-4 mt-2">
                   <div>
-                    <label className="text-sm font-medium mb-1 block">Price per SMS (NGN)</label>
+                    <label className="text-sm font-medium mb-1 block">Price per SMS ({currency})</label>
                     <Input type="number" step="0.5" value={smsSettings.smsPricePerUnit} onChange={(e) => setSmsSettings({ ...smsSettings, smsPricePerUnit: parseFloat(e.target.value) || 0 })} placeholder="e.g. 2.5" />
                     <p className="text-xs text-gray-400 mt-1">Amount deducted from tenant credits per SMS sent</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-1 block">Price per WhatsApp (NGN)</label>
+                    <label className="text-sm font-medium mb-1 block">Price per WhatsApp ({currency})</label>
                     <Input type="number" step="0.5" value={smsSettings.whatsappPricePerUnit} onChange={(e) => setSmsSettings({ ...smsSettings, whatsappPricePerUnit: parseFloat(e.target.value) || 0 })} placeholder="e.g. 3.0" />
                     <p className="text-xs text-gray-400 mt-1">Amount deducted from tenant credits per WhatsApp message</p>
                   </div>
@@ -1530,7 +1533,7 @@ export default function AdminPlatformPage() {
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-1 block">Webhook Verify Token</label>
-                    <Input type="password" value={whatsappSettings.whatsappWebhookVerifyToken} onChange={(e) => setWhatsappSettings({ ...whatsappSettings, webhookVerifyToken: e.target.value })} placeholder="Your verify token" />
+                    <Input type="password" value={whatsappSettings.whatsappWebhookVerifyToken} onChange={(e) => setWhatsappSettings({ ...whatsappSettings, whatsappWebhookVerifyToken: e.target.value })} placeholder="Your verify token" />
                   </div>
                 </div>
                 <div className="flex gap-3">
@@ -1633,7 +1636,7 @@ export default function AdminPlatformPage() {
                     <TableRow>
                       <TableHead>Plan</TableHead>
                       <TableHead>Billing</TableHead>
-                      <TableHead>Price (NGN)</TableHead>
+                      <TableHead>Price ({currency})</TableHead>
                       <TableHead>SMS Credits</TableHead>
                       <TableHead>WhatsApp Credits</TableHead>
                       <TableHead>Active</TableHead>

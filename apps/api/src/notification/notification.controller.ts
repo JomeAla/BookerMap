@@ -22,6 +22,7 @@ import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { NotificationService } from './notification.service';
 import { WebPushService } from './web-push.service';
+import { MobilePushService } from './mobile-push.service';
 import { WhatsAppService } from './whatsapp.service';
 import { SmsCreditService } from './sms-credit.service';
 import { PlatformSmsSettingsService } from './platform-sms-settings.service';
@@ -29,6 +30,7 @@ import { NotificationFilterDto } from './dto/notification-filter.dto';
 import { SendTeamNotificationDto } from './dto/send-team-notification.dto';
 import { WhatsAppWebhookQueryDto } from './dto/whatsapp-webhook.dto';
 import { GrantSmsCreditsDto, SmsSettingsDto, WhatsappSettingsDto, ToggleSmsSettingsDto } from './dto/sms-settings.dto';
+import { RegisterDeviceTokenDto } from './dto/device-token.dto';
 
 @ApiTags('Notifications')
 @Controller('notifications')
@@ -36,6 +38,7 @@ export class NotificationController {
   constructor(
     private readonly notificationService: NotificationService,
     private readonly webPushService: WebPushService,
+    private readonly mobilePushService: MobilePushService,
     private readonly whatsAppService: WhatsAppService,
     private readonly smsCreditService: SmsCreditService,
     private readonly platformSmsSettingsService: PlatformSmsSettingsService,
@@ -224,6 +227,69 @@ export class NotificationController {
     @Query('limit') limit?: string,
   ) {
     return this.smsCreditService.getTransactions(user.tenantId, page ? parseInt(page) : 1, limit ? parseInt(limit) : 20);
+  }
+
+  // Mobile Push Notification Endpoints
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('push/device')
+  @ApiOperation({ summary: 'Register a mobile device token for push notifications' })
+  @ApiResponse({ status: 201, description: 'Device registered successfully' })
+  async registerDevice(
+    @CurrentUser() user: { id: string },
+    @Body() dto: RegisterDeviceTokenDto,
+  ) {
+    return this.mobilePushService.registerDevice(
+      user.id,
+      dto.token,
+      dto.platform,
+      dto.deviceId,
+      dto.appVersion,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Delete('push/device/:token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Unregister a mobile device token' })
+  @ApiResponse({ status: 200, description: 'Device unregistered successfully' })
+  async unregisterDevice(
+    @CurrentUser() user: { id: string },
+    @Param('token') token: string,
+  ) {
+    return this.mobilePushService.unregisterDevice(token, user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('push/devices')
+  @ApiOperation({ summary: 'List current user mobile devices' })
+  @ApiResponse({ status: 200, description: 'List of registered devices' })
+  async listUserDevices(@CurrentUser() user: { id: string }) {
+    return this.mobilePushService.getUserDevices(user.id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  @ApiBearerAuth()
+  @Post('push/broadcast')
+  @ApiOperation({ summary: 'Send push notification to all tenant devices (admin/owner only)' })
+  @ApiResponse({ status: 200, description: 'Broadcast sent' })
+  async broadcastPush(
+    @CurrentUser() user: { tenantId: string },
+    @Body() body: { title: string; body: string; data?: Record<string, string> },
+  ) {
+    const tokens = await this.mobilePushService.getAllActiveDeviceTokens(user.tenantId);
+    if (tokens.length === 0) {
+      return { success: true, sent: 0, failed: 0, message: 'No registered devices' };
+    }
+    const result = await this.mobilePushService.sendToTokens(tokens, {
+      title: body.title,
+      body: body.body,
+      data: body.data,
+    });
+    return { success: result.success, sent: tokens.length - result.failureCount, failed: result.failureCount };
   }
 
   // Webhook endpoints (no auth — called by providers)

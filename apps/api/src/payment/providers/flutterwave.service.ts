@@ -183,13 +183,16 @@ export class FlutterwaveService implements PaymentProvider {
     tenantId: string,
   ): Promise<any> {
     const headers = await this.getAuthHeaders(tenantId);
+    const settings = await this.prisma.paymentSettings.findFirst({ where: { tenantId, isActive: true } });
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    const currency = tenant?.currency || 'NGN';
     try {
       const response = await axios.post(
         `${this.baseUrl}/charges?type=card`,
         {
           tx_ref: `BMR-CHG-${tenantId.slice(0, 8)}-${Date.now()}`,
           amount,
-          currency: 'NGN',
+          currency,
           email,
           authorization: { mode: 'pin', pin: authorizationCode },
         },
@@ -222,6 +225,8 @@ export class FlutterwaveService implements PaymentProvider {
     tenantId: string,
   ): Promise<any> {
     const headers = await this.getAuthHeaders(tenantId);
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    const currency = tenant?.currency || 'NGN';
     try {
       const response = await axios.post(
         `${this.baseUrl}/transfers/recipients`,
@@ -230,7 +235,7 @@ export class FlutterwaveService implements PaymentProvider {
           name,
           account_number: accountNumber,
           bank_code: bankCode,
-          currency: 'NGN',
+          currency,
         },
         { headers },
       );
@@ -242,13 +247,15 @@ export class FlutterwaveService implements PaymentProvider {
 
   async initiateTransfer(amount: number, recipientCode: string, tenantId: string): Promise<any> {
     const headers = await this.getAuthHeaders(tenantId);
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    const currency = tenant?.currency || 'NGN';
     try {
       const response = await axios.post(
         `${this.baseUrl}/transfers`,
         {
           amount,
           recipient: recipientCode,
-          currency: 'NGN',
+          currency,
           reference: `BMR-TRF-${tenantId.slice(0, 8)}-${Date.now()}`,
         },
         { headers },

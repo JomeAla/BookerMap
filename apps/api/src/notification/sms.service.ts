@@ -81,7 +81,7 @@ export class SmsService {
       this.logger.log(`SMS sent to ${phone}, count: ${response.count}, price: ${response.price}`);
       return {
         success: true,
-        messageId: response.data?.[0]?.id?.toString() || `sms_${Date.now()}`,
+        messageId: String(response.count || `sms_${Date.now()}`),
         count: response.count,
         price: response.price,
       };
@@ -142,7 +142,7 @@ export class SmsService {
 
     try {
       const response = await client.data.getBalance();
-      return { balance: response.balance, currency: response.currency };
+      return { balance: response.balance ?? 0, currency: (response.data as any)?.currency };
     } catch (error: any) {
       this.logger.error(`Failed to get SMS balance: ${error.message || error}`);
       return null;

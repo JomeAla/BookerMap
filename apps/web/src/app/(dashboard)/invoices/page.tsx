@@ -15,6 +15,7 @@ import { TableSkeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { useTenantCurrency } from '@/hooks/useTenantCurrency'
 import { FileText, Plus, Trash2 } from 'lucide-react'
 import type { Invoice, Customer } from '@/types'
 
@@ -36,6 +37,7 @@ interface LineItemEntry {
 }
 
 export default function InvoicesPage() {
+  const { currency } = useTenantCurrency()
   const queryClient = useQueryClient()
   const { addToast } = useToast()
   const [statusFilter, setStatusFilter] = React.useState('')
@@ -290,10 +292,10 @@ export default function InvoicesPage() {
                         <TableCell>{inv.customer?.firstName} {inv.customer?.lastName}</TableCell>
                         <TableCell>
                           <div className="space-y-1">
-                            <div className="text-sm font-medium">{formatCurrency(inv.total)}</div>
+                            <div className="text-sm font-medium">{formatCurrency(inv.total, inv.currency || currency)}</div>
                             {(invPaid > 0 && inv.status !== 'PAID' && inv.status !== 'REFUNDED') && (
                               <div className="text-xs text-green-600 dark:text-green-400">
-                                {formatCurrency(invPaid)} paid
+                                {formatCurrency(invPaid, inv.currency || currency)} paid
                               </div>
                             )}
                             {(invPaid > 0 && inv.status !== 'PAID' && inv.status !== 'REFUNDED') && (

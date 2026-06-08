@@ -158,7 +158,7 @@ export default function PublicReviewList({ tenantSlug }: { tenantSlug?: string }
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {displayedReviews.map((review) => (
+        {(displayedReviews ?? []).map((review) => (
           <ReviewCard key={review.id} review={review} />
         ))}
       </div>

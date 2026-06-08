@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { ArrowLeft, User, Phone, Mail, Clock, Wrench, DollarSign, MapPin, Star, Package, Plus, Upload, Trash2, FileIcon, Navigation, CreditCard } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import dynamic from 'next/dynamic'
 import type { Booking, Dispatch, Review, BookingInventory, InventoryItem, BookingFile, LocationUpdate, Terminal } from '@/types'
@@ -485,7 +486,7 @@ function PosPaymentSection({ booking }: { booking: Booking }) {
                   })),
                 ]}
                 value={posTerminalId}
-                onChange={(e) => setPosTerminalId(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPosTerminalId(e.target.value)}
               />
             )}
 

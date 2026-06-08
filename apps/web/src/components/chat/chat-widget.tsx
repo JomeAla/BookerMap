@@ -7,6 +7,7 @@ import type { ChatPaymentAction } from '@/types'
 import { VoiceInputButton } from '@/components/chat/voice-input-button'
 import { VoiceOutputToggle } from '@/components/chat/voice-output-toggle'
 import { getSpeechService } from '@/lib/speech-service'
+import { getCurrencySymbol } from '@/lib/utils'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -57,7 +58,7 @@ function PaymentCard({ action }: { action: ChatPaymentAction }) {
         </div>
         {action.amount && (
           <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-            {action.currency || 'NGN'} {action.amount.toLocaleString()}
+            {getCurrencySymbol(action.currency)} {action.amount.toLocaleString()}
           </p>
         )}
         {action.invoiceNumber && (
@@ -95,7 +96,7 @@ function PaymentCard({ action }: { action: ChatPaymentAction }) {
       )}
       {action.amount && (
         <p className="text-base font-bold text-blue-800 dark:text-blue-200 mt-1">
-          {action.currency || 'NGN'} {action.amount.toLocaleString()}
+          {getCurrencySymbol(action.currency)} {action.amount.toLocaleString()}
         </p>
       )}
       {action.paymentLink && (

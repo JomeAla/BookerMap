@@ -70,10 +70,13 @@ export class PaymentController {
       dto.provider,
     );
 
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    const paymentCurrency = invoice.currency || tenant?.currency || 'NGN';
+
     await this.prisma.payment.create({
       data: {
         amount: paymentAmount,
-        currency: 'NGN',
+        currency: paymentCurrency,
         status: 'PENDING',
         provider: dto.provider || 'PAYSTACK',
         providerRef: result.reference,
@@ -177,10 +180,13 @@ export class PaymentController {
   async initPosPayment(@Body() dto: InitPosPaymentDto, @TenantId() tenantId: string) {
     const result = await this.paymentService.initiatePOSPayment(tenantId, dto);
 
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    const paymentCurrency = tenant?.currency || 'NGN';
+
     await this.prisma.payment.create({
       data: {
         amount: dto.amount,
-        currency: 'NGN',
+        currency: paymentCurrency,
         status: 'PENDING',
         provider: dto.provider === 'flutterwave' ? 'FLUTTERWAVE' : 'PAYSTACK',
         providerRef: result.reference,

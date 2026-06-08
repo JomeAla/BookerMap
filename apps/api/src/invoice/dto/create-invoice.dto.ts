@@ -43,4 +43,8 @@ export class CreateInvoiceDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  currency?: string;
 }

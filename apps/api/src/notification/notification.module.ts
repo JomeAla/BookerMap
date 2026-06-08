@@ -7,6 +7,7 @@ import { NotificationController } from './notification.controller';
 import { BulkSmsController } from './bulk-sms.controller';
 import { NotificationService } from './notification.service';
 import { WebPushService } from './web-push.service';
+import { MobilePushService } from './mobile-push.service';
 import { EmailService } from './email.service';
 import { SmsService } from './sms.service';
 import { WhatsAppService } from './whatsapp.service';
@@ -21,6 +22,7 @@ import { BulkSmsService } from './bulk-sms.service';
   providers: [
     NotificationService,
     WebPushService,
+    MobilePushService,
     EmailService,
     SmsService,
     WhatsAppService,
@@ -29,6 +31,6 @@ import { BulkSmsService } from './bulk-sms.service';
     ReminderCronService,
     BulkSmsService,
   ],
-  exports: [NotificationService, WebPushService, EmailService, SmsService, WhatsAppService, SmsCreditService, PlatformSmsSettingsService, BulkSmsService],
+  exports: [NotificationService, WebPushService, MobilePushService, EmailService, SmsService, WhatsAppService, SmsCreditService, PlatformSmsSettingsService, BulkSmsService],
 })
 export class NotificationModule {}

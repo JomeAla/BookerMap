@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import { useTenantCurrency } from '@/hooks/useTenantCurrency'
 import { useToast } from '@/components/ui/toast'
 import { Search, CreditCard, ArrowRightLeft, X, FileText, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
@@ -24,6 +25,7 @@ const STATUS_VARIANTS: Record<string, 'success' | 'secondary' | 'destructive' | 
 }
 
 export default function AdminSubscriptionsPage() {
+  const { currency } = useTenantCurrency()
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [page, setPage] = React.useState(1)
@@ -169,7 +171,7 @@ export default function AdminSubscriptionsPage() {
                       <Badge variant={STATUS_VARIANTS[sub.status] || 'secondary'}>{sub.status}</Badge>
                     </TableCell>
                     <TableCell className="capitalize">{sub.billingCycle?.toLowerCase()}</TableCell>
-                    <TableCell>{formatCurrency(sub.price / 100, 'NGN')}</TableCell>
+                    <TableCell>{formatCurrency(sub.price / 100, currency)}</TableCell>
                     <TableCell>{formatDate(sub.currentPeriodEnd, 'MMM d, yyyy')}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
@@ -300,7 +302,7 @@ export default function AdminSubscriptionsPage() {
                 {subInvoices.map((inv: any) => (
                   <TableRow key={inv.id}>
                     <TableCell className="text-sm">{formatDate(inv.createdAt, 'MMM d, yyyy')}</TableCell>
-                    <TableCell className="text-sm font-medium">{formatCurrency(inv.amount / 100, inv.currency || 'NGN')}</TableCell>
+                    <TableCell className="text-sm font-medium">{formatCurrency(inv.amount / 100, inv.currency || currency)}</TableCell>
                     <TableCell>
                       <Badge variant={inv.status === 'PAID' ? 'success' : inv.status === 'PENDING' ? 'warning' : 'destructive'}>
                         {inv.status}

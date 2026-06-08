@@ -40,7 +40,7 @@ import {
   Square,
   Target,
 } from 'lucide-react'
-import { Input as InputIcon } from 'lucide-react'
+import { FormInput as InputIcon } from 'lucide-react'
 import type { ConversationFlow } from '@/types'
 
 const nodeTypeConfig = {

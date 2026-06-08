@@ -244,6 +244,7 @@ export interface Invoice {
   dueDate: string
   paidAt?: string | null
   notes?: string | null
+  currency?: string
   createdAt: string
   updatedAt: string
   tenantId: string

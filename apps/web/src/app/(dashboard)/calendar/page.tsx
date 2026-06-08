@@ -431,7 +431,7 @@ export default function CalendarPage() {
               <Button variant="outline" size="sm" onClick={handleCancelAction}>
                 Cancel
               </Button>
-              <Button variant="default" size="sm" onClick={handleConfirmAction}>
+              <Button variant="primary" size="sm" onClick={handleConfirmAction}>
                 Confirm
               </Button>
             </div>
@@ -456,7 +456,7 @@ export default function CalendarPage() {
             </p>
             <div className="pt-2">
               <Button
-                variant="default"
+                variant="primary"
                 size="sm"
                 className="w-full"
                 onClick={() => {

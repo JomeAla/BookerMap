@@ -17,6 +17,7 @@ interface ToastContextType {
   toasts: Toast[]
   addToast: (message: string, variant?: ToastVariant) => void
   removeToast: (id: string) => void
+  toast: (messageOrOpts: string | { title: string; variant?: string }, variant?: ToastVariant) => void
 }
 
 const ToastContext = React.createContext<ToastContextType | undefined>(undefined)
@@ -36,6 +37,15 @@ function ToastProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
+  const toast = React.useCallback((messageOrOpts: string | { title: string; variant?: string }, variantArg?: ToastVariant) => {
+    if (typeof messageOrOpts === 'string') {
+      addToast(messageOrOpts, variantArg)
+    } else {
+      const v = messageOrOpts.variant === 'destructive' ? 'error' : (messageOrOpts.variant as ToastVariant) || 'info'
+      addToast(messageOrOpts.title, v)
+    }
+  }, [addToast])
+
   const iconMap: Record<ToastVariant, React.ReactNode> = {
     success: <CheckCircle className="h-4 w-4 shrink-0" />,
     error: <AlertCircle className="h-4 w-4 shrink-0" />,
@@ -44,7 +54,7 @@ function ToastProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <ToastContext.Provider value={{ toasts, addToast, removeToast }}>
+    <ToastContext.Provider value={{ toasts, addToast, removeToast, toast }}>
       {children}
       <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
         <AnimatePresence>

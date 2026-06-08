@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { Building2, Globe, Clock, DollarSign } from 'lucide-react'
 import type { Tenant } from '@/types'
+import { CURRENCIES } from '@/lib/utils'
 
 const timezones = [
   { value: 'Africa/Lagos', label: 'Africa/Lagos (WAT)' },
@@ -27,15 +28,10 @@ const timezones = [
   { value: 'Australia/Sydney', label: 'Australia/Sydney (AEST)' },
 ]
 
-const currencies = [
-  { value: 'NGN', label: 'NGN - Nigerian Naira' },
-  { value: 'KES', label: 'KES - Kenyan Shilling' },
-  { value: 'GHS', label: 'GHS - Ghanaian Cedi' },
-  { value: 'ZAR', label: 'ZAR - South African Rand' },
-  { value: 'USD', label: 'USD - US Dollar' },
-  { value: 'GBP', label: 'GBP - British Pound' },
-  { value: 'EUR', label: 'EUR - Euro' },
-]
+const currencies = Object.entries(CURRENCIES).map(([code, info]) => ({
+  value: code,
+  label: `${code} - ${info.symbol} ${info.name}`,
+}))
 
 export default function SettingsPage() {
   const { addToast } = useToast()
@@ -47,6 +43,7 @@ export default function SettingsPage() {
       const { data } = await api.get('/tenant')
       const tenant = data.data as Tenant
       setForm({ name: tenant.name, timezone: tenant.timezone, currency: tenant.currency })
+      localStorage.setItem('bm_tenant_currency', tenant.currency)
       return tenant
     },
   })
@@ -56,7 +53,10 @@ export default function SettingsPage() {
       const { data } = await api.patch('/tenant', form)
       return data.data
     },
-    onSuccess: () => addToast('Settings updated', 'success'),
+    onSuccess: () => {
+      localStorage.setItem('bm_tenant_currency', form.currency)
+      addToast('Settings updated', 'success')
+    },
     onError: () => addToast('Failed to update settings', 'error'),
   })
 
