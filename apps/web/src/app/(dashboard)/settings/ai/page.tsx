@@ -10,7 +10,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
-import { Sparkles, MessageSquare, Clock, Plus, Trash2, Save } from 'lucide-react'
+import { Sparkles, MessageSquare, Clock, Plus, Trash2, Save, Timer } from 'lucide-react'
 import type { AiResponse } from '@/types'
 
 type BusinessHours = Record<string, { open: string; close: string } | null>
@@ -43,6 +43,10 @@ export default function AISettingsPage() {
   const [language, setLanguage] = React.useState('en')
   const [style, setStyle] = React.useState('Friendly')
   const [businessHours, setBusinessHours] = React.useState<BusinessHours>(defaultBusinessHours)
+  const [enableResponseDelay, setEnableResponseDelay] = React.useState(false)
+  const [responseDelayMs, setResponseDelayMs] = React.useState(800)
+  const [enableTypingIndicator, setEnableTypingIndicator] = React.useState(true)
+  const [typingDurationMs, setTypingDurationMs] = React.useState(1200)
   const [loaded, setLoaded] = React.useState(false)
 
   const { data: responses, isLoading: responsesLoading } = useQuery({
@@ -68,6 +72,10 @@ export default function AISettingsPage() {
       if (settingsData.businessHours) {
         setBusinessHours(settingsData.businessHours)
       }
+      setEnableResponseDelay(settingsData.enableResponseDelay ?? false)
+      setResponseDelayMs(settingsData.responseDelayMs ?? 800)
+      setEnableTypingIndicator(settingsData.enableTypingIndicator ?? true)
+      setTypingDurationMs(settingsData.typingDurationMs ?? 1200)
       setLoaded(true)
     }
   }, [settingsData, loaded])
@@ -127,6 +135,10 @@ export default function AISettingsPage() {
       language,
       style: style.toLowerCase(),
       businessHours,
+      enableResponseDelay,
+      responseDelayMs,
+      enableTypingIndicator,
+      typingDurationMs,
     })
   }
 
@@ -245,6 +257,84 @@ export default function AISettingsPage() {
               <Save className="h-4 w-4 mr-2" />
               Save Settings
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Timer className="h-5 w-5 text-blue-600" />
+            <CardTitle className="text-base">Response Time Configuration</CardTitle>
+          </div>
+          <CardDescription>Control the perceived response delay and typing indicator for a more natural conversation feel</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5 max-w-lg">
+          <div className="space-y-3">
+            <label className="flex items-center justify-between cursor-pointer">
+              <div>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable response delay</span>
+                <p className="text-xs text-gray-500">Adds an artificial delay before the AI replies</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={enableResponseDelay}
+                onChange={(e) => setEnableResponseDelay(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 h-4 w-4"
+              />
+            </label>
+
+            {enableResponseDelay && (
+              <div className="space-y-1.5 pl-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Delay duration</label>
+                  <span className="text-xs text-gray-500 tabular-nums">{responseDelayMs} ms</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={5000}
+                  step={100}
+                  value={responseDelayMs}
+                  onChange={(e) => setResponseDelayMs(parseInt(e.target.value, 10))}
+                  className="w-full accent-blue-600"
+                />
+                <p className="text-xs text-gray-400">{(responseDelayMs / 1000).toFixed(1)}s pause before each reply</p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3 border-t border-gray-100 dark:border-gray-800 pt-4">
+            <label className="flex items-center justify-between cursor-pointer">
+              <div>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable typing indicator</span>
+                <p className="text-xs text-gray-500">Shows a typing animation to the customer before replies</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={enableTypingIndicator}
+                onChange={(e) => setEnableTypingIndicator(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 h-4 w-4"
+              />
+            </label>
+
+            {enableTypingIndicator && (
+              <div className="space-y-1.5 pl-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Typing duration</label>
+                  <span className="text-xs text-gray-500 tabular-nums">{typingDurationMs} ms</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={5000}
+                  step={100}
+                  value={typingDurationMs}
+                  onChange={(e) => setTypingDurationMs(parseInt(e.target.value, 10))}
+                  className="w-full accent-blue-600"
+                />
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

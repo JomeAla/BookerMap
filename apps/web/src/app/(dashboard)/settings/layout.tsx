@@ -4,7 +4,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Settings, Users, Sparkles, CreditCard, Tag, Calendar, MapPin, Webhook, Star, Shield, DollarSign, Percent, Globe, Key, BookOpen } from 'lucide-react'
+import { Settings, Users, Sparkles, CreditCard, Tag, Calendar, MapPin, Webhook, Star, Shield, DollarSign, Percent, Globe, Key, BookOpen, Compass } from 'lucide-react'
 
 const tabs = [
   { href: '/settings', label: 'General', icon: Settings },
@@ -14,6 +14,7 @@ const tabs = [
   { href: '/settings/coupons', label: 'Coupons', icon: Tag },
   { href: '/settings/calendar', label: 'Calendar', icon: Calendar },
   { href: '/settings/locations', label: 'Locations', icon: MapPin },
+  { href: '/settings/territories', label: 'Territories', icon: Compass },
   { href: '/settings/reviews', label: 'Reviews', icon: Star },
   { href: '/settings/pricing', label: 'Pricing', icon: Percent },
   { href: '/settings/domain', label: 'Domain', icon: Globe },

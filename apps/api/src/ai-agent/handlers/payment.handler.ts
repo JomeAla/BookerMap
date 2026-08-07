@@ -48,6 +48,12 @@ export class PaymentHandler {
   async handlePaymentIntent(params: PaymentIntentParams): Promise<PaymentIntentResult> {
     const { tenantId, phone, email, amount, invoiceNumber } = params;
 
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { currency: true, name: true },
+    });
+    const tenantCurrency = tenant?.currency || 'NGN';
+
     const customerWhere: Record<string, any> = { tenantId };
     if (phone) customerWhere.phone = phone;
     if (email) customerWhere.email = email;
@@ -89,7 +95,7 @@ export class PaymentHandler {
     if (amount && Math.abs(amount - invoice.total) > 1) {
       return {
         success: false,
-        message: `The amount you mentioned (${formatCurrency(amount)}) doesn't match your invoice ${invoice.invoiceNumber} which is for ${formatCurrency(invoice.total)}.`,
+        message: `The amount you mentioned (${formatCurrency(amount, tenantCurrency)}) doesn't match your invoice ${invoice.invoiceNumber} which is for ${formatCurrency(invoice.total, tenantCurrency)}.`,
         data: {
           amount: invoice.total,
           invoiceNumber: invoice.invoiceNumber,
@@ -126,7 +132,7 @@ export class PaymentHandler {
       await this.prisma.payment.create({
         data: {
           amount: invoice.total,
-          currency: 'NGN',
+          currency: tenantCurrency,
           status: 'PENDING',
           provider: providerName,
           providerRef: paymentResult.reference,
@@ -139,13 +145,13 @@ export class PaymentHandler {
 
     return {
       success: true,
-      message: `I've prepared a payment for invoice ${invoice.invoiceNumber} (${formatCurrency(invoice.total)}). Click the button below to complete your payment.`,
+      message: `I've prepared a payment for invoice ${invoice.invoiceNumber} (${formatCurrency(invoice.total, tenantCurrency)}). Click the button below to complete your payment.`,
       data: {
         authorizationUrl: paymentResult.authorizationUrl,
         reference: paymentResult.reference,
         invoiceNumber: invoice.invoiceNumber,
         amount: invoice.total,
-        currency: 'NGN',
+        currency: tenantCurrency,
         invoiceId: invoice.id,
       },
     };
@@ -164,7 +170,7 @@ export class PaymentHandler {
     if (payment.status === 'SUCCESS') {
       return {
         success: true,
-        message: `Your payment of ${formatCurrency(payment.invoice.total)} for invoice ${payment.invoice.invoiceNumber} was successful. Thank you!`,
+        message: `Your payment of ${formatCurrency(payment.invoice.total, payment.currency || 'NGN')} for invoice ${payment.invoice.invoiceNumber} was successful. Thank you!`,
         data: {
           status: 'SUCCESS',
           amount: payment.amount,
@@ -193,15 +199,15 @@ export class PaymentHandler {
         await this.paymentService.handlePaymentSuccess(payment.id, payment.invoiceId, tenantId, verification);
         return {
           success: true,
-          message: `Your payment of ${formatCurrency(payment.invoice.total)} for invoice ${payment.invoice.invoiceNumber} was successful. Thank you!`,
-          data: {
-            status: 'SUCCESS',
-            amount: payment.amount,
-            invoiceNumber: payment.invoice.invoiceNumber,
-            reference: payment.providerRef!,
-          },
-        };
-      }
+message: `Your payment of ${formatCurrency(payment.invoice.total, payment.currency || 'NGN')} for invoice ${payment.invoice.invoiceNumber} was successful. Thank you!`,
+        data: {
+          status: 'SUCCESS',
+          amount: payment.amount,
+          invoiceNumber: payment.invoice.invoiceNumber,
+          reference: payment.providerRef!,
+        },
+      };
+    }
     } catch {
       // Verification failed or still pending
     }
@@ -219,6 +225,6 @@ export class PaymentHandler {
   }
 }
 
-function formatCurrency(amount: number): string {
-  return `NGN ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function formatCurrency(amount: number, currency: string = 'NGN'): string {
+  return `${currency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

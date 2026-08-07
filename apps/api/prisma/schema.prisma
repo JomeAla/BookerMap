@@ -166,8 +166,45 @@ model Tenant {
   smsCredit         SmsCredit?
   smsCreditTransactions SmsCreditTransaction[]
   satisfactionSurveys    SatisfactionSurvey[]
+  smsTemplates      SmsTemplate[]
+  whatsappTemplates  WhatsAppTemplate[]
+  recurringPayments  RecurringPayment[]
 
   @@map("tenants")
+}
+
+model SmsTemplate {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type        String   // BOOKING_CONFIRMATION, BOOKING_REMINDER, EN_ROUTE, CUSTOM
+  name        String
+  body        String   // message body with {{variables}}
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, type])
+  @@index([tenantId])
+  @@map("sms_templates")
+}
+
+model WhatsAppTemplate {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  templateName  String   // Meta-approved template name (e.g. booking_confirmation)
+  language      String   @default("en")
+  category      String   @default("UTILITY") // UTILITY, MARKETING, AUTHENTICATION
+  body          String   // template body with {{1}} {{2}} placeholders
+  paramKeys     String[] @default([]) // variable names for each param position
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([tenantId, templateName])
+  @@index([tenantId])
+  @@map("whatsapp_templates")
 }
 
 model Subscription {
@@ -384,6 +421,7 @@ model Territory {
   id         String   @id @default(cuid())
   name       String
   boundaries Json?
+  availability Json?
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -988,6 +1026,7 @@ model BookingFile {
 model RecurringPayment {
   id            String    @id @default(cuid())
   tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customerId    String
   customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   serviceId     String

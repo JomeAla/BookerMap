@@ -85,4 +85,91 @@ export class RoutingService {
       return 0;
     }
   }
+
+  async getRoute(
+    origin: { lat: number; lng: number },
+    destination: { lat: number; lng: number },
+  ): Promise<{
+    distance: number;
+    duration: number;
+    geometry: { type: 'LineString'; coordinates: [number, number][] };
+    steps: {
+      instruction: string;
+      name: string;
+      distance: number;
+      duration: number;
+      maneuver: string;
+      modifier?: string;
+      location: [number, number];
+    }[];
+  }> {
+    try {
+      const response = await axios.get(
+        `${this.OSRM_BASE}/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}`,
+        {
+          params: { overview: 'full', steps: 'true', geometries: 'geojson' },
+          timeout: 10000,
+        },
+      );
+
+      const route = response.data.routes?.[0];
+      if (!route) {
+        return {
+          distance: 0,
+          duration: 0,
+          geometry: { type: 'LineString', coordinates: [] },
+          steps: [],
+        };
+      }
+
+      const steps = (route.legs?.[0]?.steps || []).map((s: any) => ({
+        instruction: this.formatStepInstruction(s.maneuver, s.name, s.destinations),
+        name: s.name || '',
+        distance: s.distance || 0,
+        duration: s.duration || 0,
+        maneuver: s.maneuver?.type || '',
+        modifier: s.maneuver?.modifier,
+        location: s.maneuver?.location || [0, 0],
+      }));
+
+      return {
+        distance: route.distance || 0,
+        duration: route.duration || 0,
+        geometry: route.geometry || { type: 'LineString', coordinates: [] },
+        steps,
+      };
+    } catch (error: any) {
+      this.logger.error(`OSRM getRoute failed: ${error.message}`);
+      return {
+        distance: 0,
+        duration: 0,
+        geometry: { type: 'LineString', coordinates: [] },
+        steps: [],
+      };
+    }
+  }
+
+  private formatStepInstruction(maneuver: any, name: string, destinations?: string): string {
+    const type = maneuver?.type || '';
+    const modifier = maneuver?.modifier || '';
+    const road = name || destinations || '';
+    const destSuffix = destinations && name ? ` toward ${destinations}` : '';
+
+    if (type === 'depart') return `Head ${modifier} on ${road || 'current road'}`.replace(' on ', road ? ' on ' : '');
+    if (type === 'arrive') return `Arrive at ${road || 'your destination'}`;
+    if (type === 'turn') return `Turn ${modifier} onto ${road}${destSuffix}`;
+    if (type === 'new name') return `Continue onto ${road}${destSuffix}`;
+    if (type === 'merge') return `Merge ${modifier} onto ${road}${destSuffix}`;
+    if (type === 'on ramp') return `Take the ramp ${modifier} onto ${road}${destSuffix}`;
+    if (type === 'off ramp') return `Take the exit ${modifier} onto ${road}${destSuffix}`;
+    if (type === 'fork') return `Keep ${modifier} at the fork${road ? ` onto ${road}` : ''}`;
+    if (type === 'end of road') return `Turn ${modifier} at the end of the road${road && road !== name ? '' : road ? ` onto ${road}` : ''}`;
+    if (type === 'continue') return `Continue ${modifier} on ${road}${destSuffix}`;
+    if (type === 'roundabout') return `Enter the roundabout${road ? ` and exit toward ${road}` : ''}`;
+    if (type === 'rotary') return `Enter the rotary${road ? ` and exit toward ${road}` : ''}`;
+    if (type === 'roundabout turn') return `At the roundabout, turn ${modifier} onto ${road}`;
+    if (type === 'exit roundabout') return `Exit the roundabout onto ${road}`;
+    if (type === 'exit rotary') return `Exit the rotary onto ${road}`;
+    return `${type} ${modifier} ${road}`.trim();
+  }
 }

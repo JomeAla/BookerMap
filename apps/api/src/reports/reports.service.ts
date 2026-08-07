@@ -167,6 +167,30 @@ export class ReportsService {
     return Object.values(svcMap).sort((a, b) => b.bookings - a.bookings);
   }
 
+  async getPaymentMethodBreakdown(tenantId: string, startDate: string, endDate: string) {
+    const payments = await this.prisma.payment.groupBy({
+      by: ['provider', 'currency'],
+      where: {
+        status: 'SUCCESS',
+        invoice: { tenantId },
+        createdAt: { gte: new Date(startDate), lte: new Date(endDate) },
+      },
+      _sum: { amount: true, fee: true },
+      _count: true,
+    });
+
+    const totalRevenue = payments.reduce((s, p) => s + (p._sum.amount || 0), 0);
+
+    return payments.map((p) => ({
+      provider: p.provider,
+      currency: p.currency,
+      revenue: p._sum.amount || 0,
+      fees: p._sum.fee || 0,
+      transactions: p._count,
+      percentage: totalRevenue > 0 ? ((p._sum.amount || 0) / totalRevenue) * 100 : 0,
+    }));
+  }
+
   private getGroupKey(date: Date, groupBy: 'day' | 'week' | 'month'): string {
     const d = new Date(date);
     if (groupBy === 'day') return d.toISOString().slice(0, 10);

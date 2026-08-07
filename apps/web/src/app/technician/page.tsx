@@ -15,6 +15,7 @@ import { type Dispatch, type Booking, JobStatus, type LocationUpdate } from '@/t
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useLocationSocket } from '@/components/providers/socket-provider'
 import { useAuth } from '@/hooks/useAuth'
+import NavigationPanel from '@/components/map/navigation-panel'
 
 const statusActions: { status: JobStatus; label: string; icon: React.ReactNode; variant?: 'primary' | 'outline' | 'destructive' }[] = [
   { status: JobStatus.EN_ROUTE, label: 'En Route', icon: <Navigation className="h-4 w-4" /> },
@@ -34,6 +35,29 @@ function TechnicianContent() {
   const watchIdRef = React.useRef<number | null>(null)
   const [currentLat, setCurrentLat] = React.useState<number | null>(null)
   const [currentLng, setCurrentLng] = React.useState<number | null>(null)
+  const [navTarget, setNavTarget] = React.useState<{ lat: number; lng: number; label: string } | null>(null)
+
+  const handleNavigate = React.useCallback(
+    (destLat: number, destLng: number, label: string) => {
+      if (!navigator.geolocation) {
+        addToast('Geolocation not supported by this device', 'error')
+        return
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCurrentLat(position.coords.latitude)
+          setCurrentLng(position.coords.longitude)
+          setNavTarget({ lat: destLat, lng: destLng, label })
+        },
+        (err) => {
+          setLocationError(`Location error: ${err.message}`)
+          setNavTarget({ lat: destLat, lng: destLng, label })
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
+      )
+    },
+    [addToast],
+  )
 
   const stopSharing = React.useCallback(() => {
     if (watchIdRef.current != null) {
@@ -235,6 +259,24 @@ function TechnicianContent() {
                               Stop Sharing
                             </Button>
                           )}
+                          {(dispatch.status === JobStatus.EN_ROUTE || dispatch.status === JobStatus.STARTED || dispatch.status === 'ASSIGNED') &&
+                            customer?.addresses?.[0]?.latitude != null &&
+                            customer?.addresses?.[0]?.longitude != null && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  handleNavigate(
+                                    customer.addresses![0]!.latitude!,
+                                    customer.addresses![0]!.longitude!,
+                                    `${customer.firstName} ${customer.lastName} - ${booking?.service?.name}`,
+                                  )
+                                }
+                              >
+                                <Navigation className="h-4 w-4 mr-1" />
+                                Navigate
+                              </Button>
+                            )}
                           {statusActions.map((action) => {
                             if (action.status === dispatch.status || dispatch.status === 'COMPLETED' || dispatch.status === 'CANCELLED') return null
                             return (
@@ -326,6 +368,17 @@ function TechnicianContent() {
           )}
         </TabsContent>
       </main>
+
+      {navTarget && (
+        <NavigationPanel
+          destLat={navTarget.lat}
+          destLng={navTarget.lng}
+          destLabel={navTarget.label}
+          currentLat={currentLat}
+          currentLng={currentLng}
+          onClose={() => setNavTarget(null)}
+        />
+      )}
     </div>
   )
 }

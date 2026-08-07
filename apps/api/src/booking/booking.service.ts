@@ -64,6 +64,8 @@ export class BookingService {
       }
     }
 
+    await this.validateTerritoryHours(tenantId, serviceId, start);
+
     let totalPrice = service.price;
     if (selectedModifiers?.length) {
       const selected = service.modifiers.filter(m => selectedModifiers.includes(m.id));
@@ -224,6 +226,42 @@ export class BookingService {
        newStartTime: dto.newStartTime,
      });
      
-     return rescheduled;
+      return rescheduled;
+  }
+
+  private async validateTerritoryHours(tenantId: string, serviceId: string, start: Date) {
+    const linked = await this.prisma.territoryService.findMany({
+      where: { serviceId },
+      include: { territory: { select: { id: true, name: true, availability: true, tenantId: true } } },
+    });
+    const territoriesWithHours = linked
+      .map((l) => l.territory)
+      .filter((t) => t.tenantId === tenantId && t.availability);
+
+    if (territoriesWithHours.length === 0) return;
+
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = days[start.getDay()];
+    const requestedMinutes = start.getHours() * 60 + start.getMinutes();
+
+    const withinAny = territoriesWithHours.some((t) => {
+      const hours = (t.availability as Record<string, { start: string; end: string } | null>)[dayName];
+      if (!hours) return false;
+      const open = this.timeToMinutes(hours.start);
+      const close = this.timeToMinutes(hours.end);
+      return requestedMinutes >= open && requestedMinutes < close;
+    });
+
+    if (!withinAny) {
+      const names = territoriesWithHours.map((t) => t.name).join(', ');
+      throw new BadRequestException(
+        `The requested time is outside operating hours for the service territory (${names}). Please choose a time during territory business hours.`,
+      );
+    }
+  }
+
+  private timeToMinutes(time: string): number {
+    const parts = time.split(':');
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
   }
 }

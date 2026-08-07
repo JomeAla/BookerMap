@@ -172,10 +172,53 @@ export interface Territory {
   id: string
   name: string
   boundaries?: any
+  availability?: Record<string, { start: string; end: string } | null> | null
   isActive: boolean
   createdAt: string
   updatedAt: string
   tenantId: string
+}
+
+export interface SmsTemplate {
+  id: string
+  type: string
+  name: string
+  body: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  tenantId: string
+}
+
+export interface WhatsAppTemplate {
+  id: string
+  templateName: string
+  language: string
+  category: string
+  body: string
+  paramKeys: string[]
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  tenantId: string
+}
+
+export interface RecurringPayment {
+  id: string
+  tenantId: string
+  customerId: string
+  serviceId: string
+  amount: number
+  currency: string
+  frequency: string
+  startDate: string
+  endDate?: string | null
+  nextPaymentAt: string
+  isActive: boolean
+  paymentMethod: string
+  reference?: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export interface Booking {

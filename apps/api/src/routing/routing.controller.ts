@@ -1,5 +1,5 @@
-import { Controller, Post, Body, UseGuards, Logger } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Body, Get, Query, UseGuards, Logger } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { RoutingService } from './routing.service';
@@ -73,5 +73,21 @@ export class RoutingController {
         origin: originStop || null,
       },
     };
+  }
+
+  @Get('route')
+  @ApiOperation({ summary: 'Get turn-by-turn route', description: 'Returns the driving route with step-by-step navigation instructions between two points' })
+  @ApiResponse({ status: 200, description: 'Route with steps' })
+  async getRoute(
+    @Query('originLat') originLat: string,
+    @Query('originLng') originLng: string,
+    @Query('destLat') destLat: string,
+    @Query('destLng') destLng: string,
+  ) {
+    const route = await this.routingService.getRoute(
+      { lat: parseFloat(originLat), lng: parseFloat(originLng) },
+      { lat: parseFloat(destLat), lng: parseFloat(destLng) },
+    );
+    return { success: true, data: route };
   }
 }

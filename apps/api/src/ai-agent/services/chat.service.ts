@@ -375,6 +375,10 @@ export class ChatService {
       fallbackMessage: aiSettings.fallbackMessage || '',
       businessHours: aiSettings.businessHours || null,
       languages: aiSettings.languages || ['en'],
+      enableResponseDelay: aiSettings.enableResponseDelay ?? false,
+      responseDelayMs: aiSettings.responseDelayMs ?? 800,
+      enableTypingIndicator: aiSettings.enableTypingIndicator ?? true,
+      typingDurationMs: aiSettings.typingDurationMs ?? 1200,
       responses,
     };
   }
@@ -397,6 +401,20 @@ export class ChatService {
     return this.prisma.aiResponse.create({
       data: { tenantId, trigger, response, language },
     });
+  }
+
+  async getResponseDelayMs(tenantId: string): Promise<{ enabled: boolean; delayMs: number; typingEnabled: boolean; typingMs: number }> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { aiSettings: true },
+    });
+    const s = (tenant?.aiSettings as Record<string, any>) || {};
+    return {
+      enabled: s.enableResponseDelay ?? false,
+      delayMs: Number.isFinite(s.responseDelayMs) ? s.responseDelayMs : 800,
+      typingEnabled: s.enableTypingIndicator ?? true,
+      typingMs: Number.isFinite(s.typingDurationMs) ? s.typingDurationMs : 1200,
+    };
   }
 
   private async loadOrCreateConversation(tenantId: string, conversationId?: string) {

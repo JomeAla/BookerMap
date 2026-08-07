@@ -5,8 +5,10 @@ import { PaystackService } from './providers/paystack.service';
 import { FlutterwaveService } from './providers/flutterwave.service';
 import { PaymentService } from './payment.service';
 import { CardService } from './card.service';
+import { RecurringPaymentService } from './recurring-payment.service';
 import { PaymentController } from './payment.controller';
 import { PaymentSettingsController } from './payment-settings.controller';
+import { RecurringPaymentController } from './recurring-payment.controller';
 import { PaystackWebhookController } from './webhooks/paystack.webhook.controller';
 import { FlutterwaveWebhookController } from './webhooks/flutterwave.webhook.controller';
 
@@ -15,6 +17,7 @@ import { FlutterwaveWebhookController } from './webhooks/flutterwave.webhook.con
   controllers: [
     PaymentController,
     PaymentSettingsController,
+    RecurringPaymentController,
     PaystackWebhookController,
     FlutterwaveWebhookController,
   ],
@@ -23,7 +26,8 @@ import { FlutterwaveWebhookController } from './webhooks/flutterwave.webhook.con
     FlutterwaveService,
     PaymentService,
     CardService,
+    RecurringPaymentService,
   ],
-  exports: [PaymentService, PaystackService, FlutterwaveService, CardService],
+  exports: [PaymentService, PaystackService, FlutterwaveService, CardService, RecurringPaymentService],
 })
 export class PaymentModule {}

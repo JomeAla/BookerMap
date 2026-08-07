@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsArray, IsObject } from 'class-validator';
+import { IsOptional, IsString, IsArray, IsObject, IsBoolean, IsInt, IsNumber, Min, Max } from 'class-validator';
 
 export class AiSettingsDto {
   @IsOptional()
@@ -16,4 +16,24 @@ export class AiSettingsDto {
   @IsOptional()
   @IsArray()
   languages?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  enableResponseDelay?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10000)
+  responseDelayMs?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  enableTypingIndicator?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10000)
+  typingDurationMs?: number;
 }

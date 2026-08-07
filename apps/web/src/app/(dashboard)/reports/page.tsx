@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { DollarSign, CalendarCheck, Users, Wrench, TrendingUp, BarChart3 } from 'lucide-react'
+import { DollarSign, CalendarCheck, Users, Wrench, TrendingUp, BarChart3, CreditCard } from 'lucide-react'
 
 function Tooltip({ label, value }: { label: string; value: string }) {
   return (
@@ -56,6 +56,14 @@ export default function ReportsPage() {
     queryKey: ['reports-services', dateRange],
     queryFn: async () => {
       const { data } = await api.get('/reports/services', { params: dateRange })
+      return data.data as any[]
+    },
+  })
+
+  const { data: paymentMethods, isLoading: pmLoading } = useQuery({
+    queryKey: ['reports-payment-methods', dateRange],
+    queryFn: async () => {
+      const { data } = await api.get('/reports/payment-methods', { params: dateRange })
       return data.data as any[]
     },
   })
@@ -239,6 +247,36 @@ export default function ReportsPage() {
                     <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(svc.revenue)}</p>
                   </div>
                 ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-emerald-600" />
+              <CardTitle className="text-base">Payment Method Breakdown</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {pmLoading ? <Spinner /> : !paymentMethods?.length ? (
+              <div className="text-center py-8 text-sm text-gray-400">No payment data for this period</div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {paymentMethods.map((pm: any) => (
+                    <div key={pm.provider} className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <p className="text-xs text-gray-500 uppercase tracking-wider">{pm.provider}</p>
+                      <p className="text-lg font-bold text-gray-900 dark:text-white mt-1">{formatCurrency(pm.revenue)}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{pm.transactions} txns</p>
+                      <div className="mt-2 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pm.percentage}%` }} />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">{pm.percentage.toFixed(1)}%</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>

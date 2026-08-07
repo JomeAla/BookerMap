@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { NigeriaBulkSMSClient } from 'nigeriabulksms-sdk';
 import { PrismaService } from '../prisma/prisma.service';
+import { SmsTemplateService } from './sms-template.service';
 
 interface BookingSmsDetails {
   id: string;
@@ -23,7 +24,10 @@ interface SendSmsResult {
 export class SmsService {
   private readonly logger = new Logger(SmsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly smsTemplateService: SmsTemplateService,
+  ) {}
 
   private async getClient(): Promise<{ client: NigeriaBulkSMSClient | null; settings: any }> {
     const settings = await this.prisma.platformSmsSettings.findFirst();
@@ -122,17 +126,42 @@ export class SmsService {
   }
 
   async sendBookingConfirmation(phone: string, details: BookingSmsDetails): Promise<SendSmsResult> {
-    const message = `Booking Confirmed! ${details.serviceName} on ${details.startTime.toLocaleString()}. Ref: ${details.id.slice(-8).toUpperCase()}`;
+    const tenant = await this.prisma.booking.findFirst({
+      where: { id: details.id },
+      select: { tenantId: true },
+    });
+    const message = tenant?.tenantId
+      ? await this.smsTemplateService.renderTemplate(tenant.tenantId, 'BOOKING_CONFIRMATION', {
+          serviceName: details.serviceName,
+          startTime: details.startTime.toLocaleString(),
+          bookingId: details.id.slice(-8).toUpperCase(),
+        })
+      : `Booking Confirmed! ${details.serviceName} on ${details.startTime.toLocaleString()}. Ref: ${details.id.slice(-8).toUpperCase()}`;
     return this.sendSms(phone, message);
   }
 
   async sendBookingReminder(phone: string, details: BookingSmsDetails): Promise<SendSmsResult> {
-    const message = `Reminder: ${details.serviceName} is in 24 hours on ${details.startTime.toLocaleString()}.${details.address ? ' Location: ' + details.address : ''}`;
+    const tenant = await this.prisma.booking.findFirst({
+      where: { id: details.id },
+      select: { tenantId: true },
+    });
+    const message = tenant?.tenantId
+      ? await this.smsTemplateService.renderTemplate(tenant.tenantId, 'BOOKING_REMINDER', {
+          serviceName: details.serviceName,
+          startTime: details.startTime.toLocaleString(),
+          address: details.address || '',
+        })
+      : `Reminder: ${details.serviceName} is in 24 hours on ${details.startTime.toLocaleString()}.${details.address ? ' Location: ' + details.address : ''}`;
     return this.sendSms(phone, message);
   }
 
-  async sendEnRouteNotification(phone: string, technicianName: string, eta: string): Promise<SendSmsResult> {
-    const message = `Your technician ${technicianName} is en route! Estimated arrival: ${eta}.`;
+  async sendEnRouteNotification(phone: string, technicianName: string, eta: string, tenantId?: string): Promise<SendSmsResult> {
+    const message = tenantId
+      ? await this.smsTemplateService.renderTemplate(tenantId, 'EN_ROUTE', {
+          technicianName,
+          eta,
+        })
+      : `Your technician ${technicianName} is en route! Estimated arrival: ${eta}.`;
     return this.sendSms(phone, message);
   }
 

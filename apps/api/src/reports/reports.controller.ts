@@ -73,4 +73,17 @@ export class ReportsController {
   ) {
     return this.reportsService.getTopServices(tenantId, startDate, endDate);
   }
+
+  @Get('payment-methods')
+  @ApiOperation({ summary: 'Get payment method breakdown', description: 'Returns revenue breakdown by payment provider' })
+  @ApiQuery({ name: 'startDate', required: true, type: String, description: 'Start date (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'endDate', required: true, type: String, description: 'End date (YYYY-MM-DD)' })
+  @ApiResponse({ status: 200, description: 'Payment method breakdown' })
+  getPaymentMethodBreakdown(
+    @TenantId() tenantId: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    return this.reportsService.getPaymentMethodBreakdown(tenantId, startDate, endDate);
+  }
 }

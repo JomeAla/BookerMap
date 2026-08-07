@@ -355,9 +355,12 @@ export class TaskExecutor {
     }
 
     try {
-      const service = await this.prisma.service.findFirst({
-        where: { tenantId, name: { contains: entities.service, mode: 'insensitive' }, isActive: true },
-      });
+      const [service, tenant] = await Promise.all([
+        this.prisma.service.findFirst({
+          where: { tenantId, name: { contains: entities.service, mode: 'insensitive' }, isActive: true },
+        }),
+        this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } }),
+      ]);
 
       if (!service) {
         return {
@@ -373,7 +376,7 @@ export class TaskExecutor {
         data: {
           service: service.name,
           price: service.price,
-          currency: 'NGN',
+          currency: tenant?.currency || 'NGN',
           duration: service.duration,
         },
       };

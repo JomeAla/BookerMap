@@ -31,6 +31,8 @@ import {
   X,
   MessageSquare,
   MessageCircle,
+  FileText,
+  Repeat,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -50,6 +52,7 @@ const navItems: NavItem[] = [
   { href: '/dispatches', label: 'Dispatches', icon: Truck },
   { href: '/invoices', label: 'Invoices', icon: Receipt },
   { href: '/payments', label: 'Payments', icon: CreditCard },
+  { href: '/payments/recurring', label: 'Recurring', icon: Repeat },
   { href: '/inventory', label: 'Inventory', icon: Package },
   { href: '/marketing', label: 'Marketing', icon: Megaphone },
   { href: '/disputes', label: 'Disputes', icon: AlertTriangle, badgeKey: 'disputes' },
@@ -58,6 +61,8 @@ const navItems: NavItem[] = [
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/notifications/bulk-sms', label: 'Bulk SMS', icon: MessageSquare },
+  { href: '/notifications/sms-templates', label: 'SMS Templates', icon: FileText },
+  { href: '/notifications/whatsapp-templates', label: 'WhatsApp Templates', icon: MessageCircle },
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/ai-agent', label: 'AI Agent', icon: Bot },
   { href: '/ai/feedback', label: 'AI Feedback', icon: MessageCircle },

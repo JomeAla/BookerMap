@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch, Delete,
+  Controller, Get, Post, Put, Patch, Delete,
   Body, Param, UseGuards, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { TerritoryService } from './territory.service';
 import { CreateTerritoryDto } from './dto/create-territory.dto';
+import { TerritoryAvailabilityDto } from './dto/territory-availability.dto';
 
 @ApiTags('Territories')
 @ApiBearerAuth()
@@ -82,5 +83,25 @@ export class TerritoryController {
     @Param('serviceId') serviceId: string,
   ) {
     return this.territoryService.unlinkService(tenantId, id, serviceId);
+  }
+
+  @Get(':id/availability')
+  @ApiOperation({ summary: 'Get territory availability', description: 'Returns the weekly operating hours for a territory' })
+  @ApiParam({ name: 'id', type: String, description: 'Territory ID' })
+  @ApiResponse({ status: 200, description: 'Territory availability' })
+  getAvailability(@TenantId() tenantId: string, @Param('id') id: string) {
+    return this.territoryService.getAvailability(tenantId, id);
+  }
+
+  @Put(':id/availability')
+  @ApiOperation({ summary: 'Update territory availability', description: 'Set weekly operating hours for a territory. Set a day to null for closed.' })
+  @ApiParam({ name: 'id', type: String, description: 'Territory ID' })
+  @ApiResponse({ status: 200, description: 'Territory availability updated' })
+  updateAvailability(
+    @TenantId() tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: TerritoryAvailabilityDto,
+  ) {
+    return this.territoryService.updateAvailability(tenantId, id, dto.availability);
   }
 }

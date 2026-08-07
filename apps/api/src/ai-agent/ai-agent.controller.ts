@@ -39,6 +39,10 @@ export class AiAgentController {
       tenantId,
       dto.conversationId,
     );
+    const delay = await this.chatService.getResponseDelayMs(tenantId);
+    if (delay.enabled && delay.delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delay.delayMs));
+    }
     if (result.conversationId) {
       const lastAssistant = await this.prisma.aiMessage.findFirst({
         where: { conversationId: result.conversationId, role: 'assistant' },
@@ -46,10 +50,14 @@ export class AiAgentController {
         select: { id: true },
       });
       if (lastAssistant) {
-        return { ...result, messageId: lastAssistant.id };
+        return {
+          ...result,
+          messageId: lastAssistant.id,
+          typing: { enabled: delay.typingEnabled, durationMs: delay.typingMs },
+        };
       }
     }
-    return result;
+    return { ...result, typing: { enabled: delay.typingEnabled, durationMs: delay.typingMs } };
   }
 
   @UseGuards(JwtAuthGuard)
