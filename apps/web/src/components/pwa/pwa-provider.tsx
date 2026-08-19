@@ -12,7 +12,7 @@ interface BeforeInstallPromptEvent extends Event {
 const DISMISSED_KEY = 'pwa-install-dismissed';
 const PUSH_SUB_KEY = 'push-subscribed';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 async function setupPushNotifications(registration: ServiceWorkerRegistration) {
   if (!('PushManager' in window)) return;
