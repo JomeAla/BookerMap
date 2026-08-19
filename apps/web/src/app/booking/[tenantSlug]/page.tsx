@@ -10,6 +10,7 @@ import { Card, CardTitle, CardContent } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { formatCurrency } from '@/lib/utils'
+import { HoneypotField } from '@/components/honeypot-field'
 import { ChevronLeft, ChevronRight, Calendar, Clock, Building2 } from 'lucide-react'
 import { ChatWidget } from '@/components/chat/chat-widget'
 import PublicReviewList from '@/components/reviews/public-review-list'
@@ -24,6 +25,7 @@ export default function PublicBookingPage() {
   const [selectedDate, setSelectedDate] = React.useState('')
   const [selectedTime, setSelectedTime] = React.useState('')
   const [form, setForm] = React.useState({ firstName: '', lastName: '', email: '', phone: '' })
+  const [trapValue, setTrapValue] = React.useState('')
 
   const { data: tenant } = useQuery({
     queryKey: ['public-tenant', tenantSlug],
@@ -68,16 +70,21 @@ export default function PublicBookingPage() {
 
   const timeSlots = apiSlots && apiSlots.length > 0 ? apiSlots : fallbackSlots
 
+  const [bookingResult, setBookingResult] = React.useState<any>(null)
+
   const bookingMutation = useMutation({
     mutationFn: async () => {
       const startTime = `${selectedDate}T${selectedTime}:00.000Z`
-      const endTime = new Date(new Date(startTime).getTime() + (selectedService?.duration || 60) * 60000).toISOString()
       const { data } = await api.post(`/public/${tenantSlug}/bookings`, {
         serviceId: selectedServiceId,
         startTime,
-        endTime,
-        customer: form,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email || undefined,
+        phone: form.phone,
+        website_url: trapValue || undefined,
       })
+      setBookingResult(data.data)
       return data.data
     },
     onSuccess: () => {
@@ -200,6 +207,7 @@ export default function PublicBookingPage() {
 
             {step === 3 && (
               <div className="space-y-4">
+                <HoneypotField onValue={setTrapValue} />
                 <CardTitle className="text-lg mb-4">Your Information</CardTitle>
                 <div className="grid grid-cols-2 gap-4">
                   <Input label="First Name" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required />
@@ -230,6 +238,11 @@ export default function PublicBookingPage() {
                 <p className="text-gray-500 dark:text-gray-400">
                   We&apos;ve sent a confirmation to {form.email || 'your phone'}.
                 </p>
+                {bookingResult?.reference && (
+                  <p className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">
+                    Reference: <span className="text-blue-600">{bookingResult.reference}</span>
+                  </p>
+                )}
               </div>
             )}
 

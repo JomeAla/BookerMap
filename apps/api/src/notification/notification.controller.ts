@@ -229,6 +229,29 @@ export class NotificationController {
     return this.smsCreditService.getTransactions(user.tenantId, page ? parseInt(page) : 1, limit ? parseInt(limit) : 20);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('sms-credits/checkout')
+  @ApiOperation({ summary: 'Purchase SMS credits', description: 'Initialize payment to buy SMS credits (paid to the platform)' })
+  async checkoutCredits(
+    @CurrentUser() user: { id: string; tenantId: string },
+    @Body() body: { creditAmount: number; provider?: 'PAYSTACK' | 'FLUTTERWAVE' },
+  ) {
+    return this.smsCreditService.checkout(user.tenantId, body.creditAmount, body.provider);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('sms-credits/checkout/verify/:reference')
+  @ApiOperation({ summary: 'Verify SMS credit purchase' })
+  async verifyCreditPurchase(
+    @CurrentUser() user: { id: string; tenantId: string },
+    @Param('reference') reference: string,
+    @Query('provider') provider?: string,
+  ) {
+    return this.smsCreditService.verifyPurchase(user.tenantId, reference, (provider as any) || undefined);
+  }
+
   // Mobile Push Notification Endpoints
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { formatCurrency } from '@/lib/utils'
+import { HoneypotField } from '@/components/honeypot-field'
 import { ChevronLeft, ChevronRight, Calendar, Clock, Star } from 'lucide-react'
 
 export default function WidgetPage() {
@@ -19,6 +20,7 @@ export default function WidgetPage() {
   const [selectedDate, setSelectedDate] = React.useState('')
   const [selectedTime, setSelectedTime] = React.useState('')
   const [form, setForm] = React.useState({ firstName: '', lastName: '', email: '', phone: '' })
+  const [trapValue, setTrapValue] = React.useState('')
 
   const { data: tenant } = useQuery({
     queryKey: ['widget-tenant', tenantSlug],
@@ -58,6 +60,7 @@ export default function WidgetPage() {
         lastName: form.lastName,
         email: form.email || undefined,
         phone: form.phone,
+        website_url: trapValue || undefined,
       })
       return data.data
     },
@@ -175,6 +178,7 @@ export default function WidgetPage() {
 
         {step === 3 && (
           <div className="space-y-3">
+            <HoneypotField onValue={setTrapValue} />
             <p className="text-sm font-medium text-gray-900">Your Information</p>
             <div className="grid grid-cols-2 gap-2">
               <Input placeholder="First Name *" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />

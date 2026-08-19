@@ -166,15 +166,16 @@ export class PaymentHandler {
     if (!payment) {
       return { success: false, message: "I couldn't find a payment with that reference." };
     }
+    const invoice = payment.invoice!;
 
     if (payment.status === 'SUCCESS') {
       return {
         success: true,
-        message: `Your payment of ${formatCurrency(payment.invoice.total, payment.currency || 'NGN')} for invoice ${payment.invoice.invoiceNumber} was successful. Thank you!`,
+        message: `Your payment of ${formatCurrency(invoice.total, payment.currency || 'NGN')} for invoice ${invoice.invoiceNumber} was successful. Thank you!`,
         data: {
           status: 'SUCCESS',
           amount: payment.amount,
-          invoiceNumber: payment.invoice.invoiceNumber,
+          invoiceNumber: invoice.invoiceNumber,
           reference: payment.providerRef!,
         },
       };
@@ -183,11 +184,11 @@ export class PaymentHandler {
     if (payment.status === 'FAILED') {
       return {
         success: false,
-        message: `Your payment for invoice ${payment.invoice.invoiceNumber} failed. Would you like to try again?`,
+        message: `Your payment for invoice ${invoice.invoiceNumber} failed. Would you like to try again?`,
         data: {
           status: 'FAILED',
           amount: payment.amount,
-          invoiceNumber: payment.invoice.invoiceNumber,
+          invoiceNumber: invoice.invoiceNumber,
           reference: payment.providerRef!,
         },
       };
@@ -196,29 +197,29 @@ export class PaymentHandler {
     try {
       const verification = await this.paymentService.verifyPayment(reference, tenantId);
       if (verification.status === 'success') {
-        await this.paymentService.handlePaymentSuccess(payment.id, payment.invoiceId, tenantId, verification);
+        await this.paymentService.handlePaymentSuccess(payment.id, payment.invoiceId!, tenantId, verification);
         return {
           success: true,
-message: `Your payment of ${formatCurrency(payment.invoice.total, payment.currency || 'NGN')} for invoice ${payment.invoice.invoiceNumber} was successful. Thank you!`,
-        data: {
-          status: 'SUCCESS',
-          amount: payment.amount,
-          invoiceNumber: payment.invoice.invoiceNumber,
-          reference: payment.providerRef!,
-        },
-      };
-    }
+          message: `Your payment of ${formatCurrency(invoice.total, payment.currency || 'NGN')} for invoice ${invoice.invoiceNumber} was successful. Thank you!`,
+          data: {
+            status: 'SUCCESS',
+            amount: payment.amount,
+            invoiceNumber: invoice.invoiceNumber,
+            reference: payment.providerRef!,
+          },
+        };
+      }
     } catch {
       // Verification failed or still pending
     }
 
     return {
       success: true,
-      message: `Your payment for invoice ${payment.invoice.invoiceNumber} is still being processed. Please check back shortly.`,
+      message: `Your payment for invoice ${invoice.invoiceNumber} is still being processed. Please check back shortly.`,
       data: {
         status: 'PENDING',
         amount: payment.amount,
-        invoiceNumber: payment.invoice.invoiceNumber,
+        invoiceNumber: invoice.invoiceNumber,
         reference: payment.providerRef!,
       },
     };

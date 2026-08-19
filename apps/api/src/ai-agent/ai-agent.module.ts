@@ -16,7 +16,13 @@ import { PaymentHandler } from './handlers/payment.handler';
 import { FlowService } from './services/flow.service';
 
 @Module({
-  imports: [forwardRef(() => BookingModule), CustomerModule, InvoiceModule, NotificationModule, PaymentModule],
+  imports: [
+    forwardRef(() => BookingModule),
+    forwardRef(() => CustomerModule),
+    forwardRef(() => InvoiceModule),
+    forwardRef(() => NotificationModule),
+    forwardRef(() => PaymentModule),
+  ],
   controllers: [AiAgentController, FlowController],
   providers: [
     ConversationEngine,

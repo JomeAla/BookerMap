@@ -17,6 +17,8 @@ export class RolesGuard implements CanActivate {
     if (!user) {
       throw new HttpException('Forbidden: authentication required', HttpStatus.FORBIDDEN);
     }
+    // PLATFORM_ADMIN is a superset of all other roles
+    if (user.role === UserRole.PLATFORM_ADMIN) return true;
     return requiredRoles.includes(user.role);
   }
 }

@@ -11,7 +11,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
-    "test": "jest"
+    "test": "jest --runInBand"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",
@@ -50,6 +50,12 @@
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
+  },
+  "overrides": {
+    "@nestjs/swagger": {
+      "js-yaml": "^5.3.0"
+    },
+    "uuid": "^11.1.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.21",

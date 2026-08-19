@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum UserRole {
+  PLATFORM_ADMIN
   ADMIN
   OWNER
   MANAGER
@@ -244,6 +245,8 @@ model SubscriptionInvoice {
   provider       String?
   createdAt      DateTime     @default(now())
 
+  payments Payment[]
+
   @@index([tenantId])
   @@map("subscription_invoices")
 }
@@ -327,9 +330,26 @@ model Customer {
   satisfactionSurveys SatisfactionSurvey[]
   npsResponses        NPSResponse[]
   bulkSmsRecipients   BulkSmsRecipient[]
+  otpCodes            CustomerOtp[]
 
   @@unique([tenantId, phone])
   @@map("customers")
+}
+
+model CustomerOtp {
+  id        String   @id @default(cuid())
+  codeHash  String
+  channel   String   @default("SMS")
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, createdAt])
+  @@map("customer_otps")
 }
 
 model CustomerAddress {
@@ -448,6 +468,7 @@ model TerritoryService {
 
 model Booking {
   id            String        @id @default(cuid())
+  reference     String?       @unique
   startTime     DateTime
   endTime       DateTime
   status        BookingStatus @default(PENDING)
@@ -646,8 +667,10 @@ model Payment {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
-  invoiceId            String
-  invoice              Invoice               @relation(fields: [invoiceId], references: [id])
+  invoiceId            String?
+  invoice              Invoice?             @relation(fields: [invoiceId], references: [id])
+  subscriptionInvoiceId String?
+  subscriptionInvoice  SubscriptionInvoice? @relation(fields: [subscriptionInvoiceId], references: [id], onDelete: SetNull)
   recurringPaymentLogs RecurringPaymentLog[] @relation("PaymentRecurringPaymentLogs")
 
   @@map("payments")
@@ -1392,6 +1415,23 @@ model PlatformSmsSettings {
   @@map("platform_sms_settings")
 }
 
+model PlatformPaymentSettings {
+  id                       String   @id @default(cuid())
+  paystackPublicKey        String?
+  paystackSecretKey        String?  // encrypted
+  paystackWebhookSecret    String?
+  flutterwavePublicKey     String?
+  flutterwaveSecretKey     String?  // encrypted
+  flutterwaveEncryptionKey String?  // encrypted
+  flutterwaveWebhookSecret String?
+  defaultCurrency          String   @default("NGN")
+  isActive                 Boolean  @default(true)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@map("platform_payment_settings")
+}
+
 model SmsCredit {
   id             String   @id @default(cuid())
   tenantId       String   @unique
@@ -1414,9 +1454,12 @@ model SmsCreditTransaction {
   creditId    String?
   credit      SmsCredit? @relation(fields: [creditId], references: [id], onDelete: SetNull)
   amount      Float
-  balanceAfter Float
-  type        String   // GRANT, SMS_DEDUCT, WHATSAPP_DEDUCT, ADJUSTMENT
+  balanceAfter Float  @default(0)
+  type        String   // GRANT, SMS_DEDUCT, WHATSAPP_DEDUCT, PURCHASE, ADJUSTMENT
   description String?
+  status      String   @default("COMPLETED") // COMPLETED, PENDING, FAILED
+  provider    String?
+  providerRef String?
   grantedById String?
   grantedBy   User?    @relation(fields: [grantedById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
@@ -1440,4 +1483,36 @@ model PlanPricing {
 
   @@unique([plan, billingCycle])
   @@map("plan_pricing")
+}
+
+model HoneypotHit {
+  id          String   @id @default(cuid())
+  ipAddress   String
+  trapType    String // TRAP_FIELD, DECOY_ENDPOINT, SUSPICIOUS_PATTERN
+  field       String?
+  path        String?
+  userAgent   String?
+  referer     String?
+  tenantSlug  String?
+  requestBody Json?
+  createdAt   DateTime @default(now())
+
+  @@index([ipAddress])
+  @@index([createdAt])
+  @@index([trapType])
+  @@map("honeypot_hits")
+}
+
+model IpReputation {
+  id             String    @id @default(cuid())
+  ipAddress      String    @unique
+  hitCount       Int       @default(0)
+  blocked        Boolean   @default(false)
+  blockedReason  String?
+  blockExpiresAt DateTime?
+  firstSeenAt    DateTime  @default(now())
+  lastSeenAt     DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("ip_reputations")
 }

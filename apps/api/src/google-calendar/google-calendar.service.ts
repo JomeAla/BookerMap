@@ -2,9 +2,6 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { google } = require('googleapis');
-
 const SCOPES = ['https://www.googleapis.com/auth/calendar.events'];
 
 @Injectable()
@@ -16,11 +13,21 @@ export class GoogleCalendarService {
     private configService: ConfigService,
   ) {}
 
+  private _google: any = null;
+
+  private get google() {
+    if (!this._google) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      this._google = require('googleapis').google;
+    }
+    return this._google;
+  }
+
   private getOAuth2Client() {
     const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
     const clientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
     const redirectUri = this.configService.get<string>('GOOGLE_REDIRECT_URI');
-    return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+    return new this.google.auth.OAuth2(clientId, clientSecret, redirectUri);
   }
 
   getAuthUrl(userId: string): string {
@@ -114,7 +121,7 @@ export class GoogleCalendarService {
 
   async syncBookings(userId: string, tenantId: string) {
     const auth = await this.getAuthClient(userId);
-    const calendar = google.calendar({ version: 'v3', auth });
+    const calendar = this.google.calendar({ version: 'v3', auth });
 
     const bookings = await this.prisma.booking.findMany({
       where: {

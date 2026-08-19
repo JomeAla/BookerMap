@@ -8,6 +8,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { TwoFactorService } from './two-factor.service';
 import { JwtStrategy } from './jwt.strategy';
+import { CustomerJwtStrategy } from './customer-jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { MicrosoftStrategy } from './strategies/microsoft.strategy';
 
@@ -28,7 +29,7 @@ import { MicrosoftStrategy } from './strategies/microsoft.strategy';
     PrismaModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, TwoFactorService, GoogleStrategy, MicrosoftStrategy],
+  providers: [AuthService, JwtStrategy, CustomerJwtStrategy, TwoFactorService, GoogleStrategy, MicrosoftStrategy],
   exports: [PassportModule, JwtModule, AuthService],
 })
 export class AuthModule {}

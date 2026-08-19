@@ -37,9 +37,11 @@ import { SettlementModule } from './settlement/settlement.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { SatisfactionModule } from './satisfaction/satisfaction.module';
 import { DisputeModule } from './dispute/dispute.module';
+import { PlatformAdminModule } from './platform-admin/platform-admin.module';
 import { CommonModule } from './common/common.module';
 import { PublicApiModule } from './public-api/public-api.module';
 import { HealthModule } from './health/health.module';
+import { HoneypotModule } from './honeypot/honeypot.module';
 import { DomainResolverMiddleware } from './common/middleware/domain-resolver.middleware';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -87,8 +89,10 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     InventoryModule,
     SatisfactionModule,
     DisputeModule,
+    PlatformAdminModule,
     PublicApiModule,
     HealthModule,
+    HoneypotModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

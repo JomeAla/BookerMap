@@ -70,6 +70,7 @@ const navItems: NavItem[] = [
 
 const adminItems: NavItem[] = [
   { href: '/admin', label: 'Platform Admin', icon: Shield },
+  { href: '/admin/honeypot', label: 'Anti-Bot Security', icon: AlertTriangle },
   { href: '/admin/subscriptions', label: 'Subscriptions', icon: CreditCard },
 ]
 
@@ -208,7 +209,7 @@ export function Sidebar({ collapsed, onToggle, open, onClose }: SidebarProps) {
           )
         })}
 
-        {user && user.role === 'ADMIN' && (
+        {user && ['ADMIN', 'PLATFORM_ADMIN'].includes(user.role) && (
           <>
             <div className="pt-3 pb-1 px-3">
               <motion.span

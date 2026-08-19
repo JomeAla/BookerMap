@@ -4,6 +4,8 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
+import { HoneypotService } from './honeypot/honeypot.service';
+import { getClientIp } from './honeypot/honeypot.middleware';
 
 declare module 'express' {
   interface Request {
@@ -42,6 +44,35 @@ async function bootstrap() {
 
   app.use((req: Request, _res: Response, next: NextFunction) => {
     req.id = randomUUID();
+    next();
+  });
+
+  (app.getHttpAdapter().getInstance() as any).set('trust proxy', 1);
+
+  const honeypot = app.get(HoneypotService);
+  const decoyPaths = ['/admin', '/wp-admin', '/wp-login.php', '/_internal/debug'];
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (decoyPaths.includes(req.path)) {
+      const ip = getClientIp(req);
+      honeypot
+        .recordHit({
+          ip,
+          trapType: 'DECOY_ENDPOINT',
+          path: req.path,
+          userAgent: req.headers['user-agent'] as string | undefined,
+          referer: req.headers.referer as string | undefined,
+        })
+        .catch(() => undefined);
+      res
+        .status(200)
+        .set('Content-Type', 'text/html')
+        .send(
+          '<!DOCTYPE html><html><head><title>Login</title></head><body><h1>Sign in</h1>' +
+            '<form><input name="username" /><input name="password" type="password" /><button>Continue</button></form>' +
+            '</body></html>',
+        );
+      return;
+    }
     next();
   });
 

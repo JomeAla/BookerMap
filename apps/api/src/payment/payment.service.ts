@@ -62,6 +62,23 @@ export class PaymentService {
     return provider.initializePayment(email, amount, { ...metadata, provider: resolvedProvider, currency: resolvedCurrency }, tenantId);
   }
 
+  async initializePlatformPayment(
+    email: string,
+    amount: number,
+    metadata: any,
+    providerName?: 'PAYSTACK' | 'FLUTTERWAVE',
+    currency?: string,
+  ) {
+    const provider = providerName === 'FLUTTERWAVE' ? this.flutterwaveService : this.paystackService;
+    const resolvedCurrency = currency || 'NGN';
+    return provider.initializePlatformPayment(email, amount, { ...metadata, currency: resolvedCurrency });
+  }
+
+  async verifyPlatformPayment(reference: string, providerName?: 'PAYSTACK' | 'FLUTTERWAVE') {
+    const provider = providerName === 'FLUTTERWAVE' ? this.flutterwaveService : this.paystackService;
+    return provider.verifyPlatformPayment(reference);
+  }
+
   async verifyPayment(reference: string, tenantId: string) {
     const { provider } = await this.getProviderForTenant(tenantId);
     return provider.verifyPayment(reference, tenantId);
@@ -156,6 +173,58 @@ export class PaymentService {
     });
   }
 
+  async handleSubscriptionPaymentSuccess(paymentId: string, subscriptionInvoiceId: string, tenantId: string, providerData?: any) {
+    const payment = await this.prisma.payment.findUnique({ where: { id: paymentId } });
+    if (!payment) throw new HttpException('Payment not found', 404);
+    if (payment.status === 'SUCCESS') return payment;
+
+    const invoice = await this.prisma.subscriptionInvoice.findUnique({
+      where: { id: subscriptionInvoiceId },
+      include: { subscription: true },
+    });
+    if (!invoice) throw new HttpException('Subscription invoice not found', 404);
+
+    const now = new Date();
+    const periodEnd = new Date(now);
+    if (invoice.subscription.billingCycle === 'MONTHLY') {
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    } else {
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.payment.update({
+        where: { id: paymentId },
+        data: { status: 'SUCCESS', providerData: providerData || undefined },
+      }),
+      this.prisma.subscriptionInvoice.update({
+        where: { id: invoice.id },
+        data: { status: 'PAID', paidAt: now, reference: invoice.reference, provider: invoice.provider },
+      }),
+      this.prisma.subscription.update({
+        where: { tenantId },
+        data: {
+          status: 'ACTIVE',
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+          canceledAt: null,
+        },
+      }),
+    ]);
+
+    this.logger.log(
+      `Subscription payment ${paymentId} confirmed. Tenant ${tenantId} now ACTIVE (${invoice.subscription.plan})`,
+    );
+
+    this.webhookService.dispatchEvent(tenantId, 'subscription.paid', {
+      subscriptionInvoiceId: invoice.id,
+      plan: invoice.subscription.plan,
+      paymentId,
+    }).catch((err) => this.logger.error('Webhook dispatch failed', err));
+
+    return payment;
+  }
+
   async refundPayment(paymentId: string, amount: number | undefined, tenantId: string): Promise<any> {
     const payment = await this.prisma.payment.findFirst({
       where: { id: paymentId, invoice: { tenantId } },
@@ -173,7 +242,7 @@ export class PaymentService {
       data: { status: newStatus as any },
     });
 
-    if (newStatus === 'REFUNDED') {
+    if (newStatus === 'REFUNDED' && payment.invoiceId) {
       const invoice = await this.prisma.invoice.findUnique({
         where: { id: payment.invoiceId },
       });

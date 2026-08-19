@@ -6,7 +6,7 @@ import { InvoicePdfService } from './invoice-pdf.service';
 import { InvoiceController } from './invoice.controller';
 
 @Module({
-  imports: [NotificationModule, forwardRef(() => WebhookModule)],
+  imports: [forwardRef(() => NotificationModule), forwardRef(() => WebhookModule)],
   controllers: [InvoiceController],
   providers: [InvoiceService, InvoicePdfService],
   exports: [InvoiceService],

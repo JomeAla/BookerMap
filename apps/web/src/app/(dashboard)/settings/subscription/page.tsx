@@ -11,14 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { useTenantCurrency } from '@/hooks/useTenantCurrency'
-import { CreditCard, AlertCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react'
-
-const PLAN_PRICES: Record<string, { monthly: number; yearly: number }> = {
-  FREE: { monthly: 0, yearly: 0 },
-  BASIC: { monthly: 9900, yearly: 99900 },
-  PRO: { monthly: 29900, yearly: 299900 },
-  ENTERPRISE: { monthly: 99900, yearly: 999900 },
-}
+import { CreditCard, AlertCircle, CheckCircle, XCircle, Loader2, ExternalLink } from 'lucide-react'
 
 const PLAN_LABELS: Record<string, string> = {
   FREE: 'Free',
@@ -27,13 +20,15 @@ const PLAN_LABELS: Record<string, string> = {
   ENTERPRISE: 'Enterprise',
 }
 
-const STATUS_VARIANTS: Record<string, 'success' | 'secondary' | 'destructive' | 'outline'> = {
+const STATUS_VARIANTS: Record<string, 'success' | 'secondary' | 'destructive' | 'outline' | 'warning'> = {
   ACTIVE: 'success',
-  PAST_DUE: 'secondary',
+  PAST_DUE: 'warning',
   CANCELED: 'destructive',
   EXPIRED: 'destructive',
   TRIALING: 'secondary',
 }
+
+const PENDING_CHECKOUT_KEY = 'bm_pending_sub_checkout'
 
 function ConfirmDialog({ open, title, message, onConfirm, onCancel, loading }: any) {
   if (!open) return null
@@ -62,6 +57,17 @@ export default function SubscriptionSettingsPage() {
   const [showChangePlan, setShowChangePlan] = React.useState(false)
   const [selectedPlan, setSelectedPlan] = React.useState<string | null>(null)
   const [selectedCycle, setSelectedCycle] = React.useState<'MONTHLY' | 'YEARLY'>('MONTHLY')
+  const [selectedProvider, setSelectedProvider] = React.useState<'PAYSTACK' | 'FLUTTERWAVE'>('PAYSTACK')
+  const [pendingCheckout, setPendingCheckout] = React.useState<{ plan: string; billingCycle: string; reference: string; created: string } | null>(null)
+
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PENDING_CHECKOUT_KEY)
+      if (raw) setPendingCheckout(JSON.parse(raw))
+    } catch {
+      // ignore
+    }
+  }, [])
 
   const { data: subscription, isLoading } = useQuery({
     queryKey: ['my-subscription'],
@@ -79,21 +85,74 @@ export default function SubscriptionSettingsPage() {
     },
   })
 
-  const changePlan = useMutation({
+  const { data: planPricing, isLoading: plansLoading } = useQuery({
+    queryKey: ['plan-pricing-public'],
+    queryFn: async () => {
+      const { data } = await api.get('/plan-pricing')
+      return data.data as any[]
+    },
+  })
+
+  const checkout = useMutation({
     mutationFn: async () => {
-      const { data } = await api.patch('/subscriptions/my/plan', {
+      const { data } = await api.post('/subscriptions/my/checkout', {
         plan: selectedPlan,
         billingCycle: selectedCycle,
+        provider: selectedProvider,
       })
       return data
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-subscription'] })
-      addToast('Plan updated successfully', 'success')
-      setShowChangePlan(false)
+    onSuccess: (res) => {
+      const payload = res.data
+      if (payload.free) {
+        addToast('Plan updated', 'success')
+        queryClient.invalidateQueries({ queryKey: ['my-subscription'] })
+        setShowChangePlan(false)
+        return
+      }
+      const authUrl: string = payload.authorizationUrl
+      if (authUrl) {
+        localStorage.setItem(PENDING_CHECKOUT_KEY, JSON.stringify({
+          plan: selectedPlan,
+          billingCycle: selectedCycle,
+          reference: payload.reference,
+          created: new Date().toISOString(),
+        }))
+        setPendingCheckout({ plan: selectedPlan!, billingCycle: selectedCycle, reference: payload.reference, created: new Date().toISOString() })
+        window.location.href = authUrl
+      } else {
+        addToast('Checkout returned no payment link', 'error')
+      }
     },
     onError: (err: any) => {
-      addToast(err.response?.data?.message || 'Failed to update plan', 'error')
+      addToast(err.response?.data?.message || 'Failed to start checkout', 'error')
+    },
+  })
+
+  const verifyCheckout = useMutation({
+    mutationFn: async (reference: string) => {
+      const { data } = await api.get(`/subscriptions/my/checkout/verify/${reference}`)
+      return data
+    },
+    onSuccess: (res) => {
+      const payload = res.data
+      if (payload.status === 'SUCCESS' || payload.subscription) {
+        addToast('Payment received — your plan is now active', 'success')
+        localStorage.removeItem(PENDING_CHECKOUT_KEY)
+        setPendingCheckout(null)
+        queryClient.invalidateQueries({ queryKey: ['my-subscription'] })
+        queryClient.invalidateQueries({ queryKey: ['my-invoices'] })
+        setShowChangePlan(false)
+      } else if (payload.status === 'PENDING') {
+        addToast('Payment is still being processed. Please complete it in the payment window, then verify again.', 'error')
+      } else {
+        addToast('Payment was not completed. Please try again.', 'error')
+        localStorage.removeItem(PENDING_CHECKOUT_KEY)
+        setPendingCheckout(null)
+      }
+    },
+    onError: (err: any) => {
+      addToast(err.response?.data?.message || 'Failed to verify payment', 'error')
     },
   })
 
@@ -121,11 +180,40 @@ export default function SubscriptionSettingsPage() {
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your plan and billing</p>
       </div>
 
+      {pendingCheckout && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" /> Payment In Progress
+            </CardTitle>
+            <CardDescription>
+              You have an outstanding checkout for {PLAN_LABELS[pendingCheckout.plan] || pendingCheckout.plan} (
+              {pendingCheckout.billingCycle?.toLowerCase()}). If you already completed payment in the provider window, verify it below. Otherwise open the payment page again.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-3">
+            <Button onClick={() => verifyCheckout.mutate(pendingCheckout.reference)} disabled={verifyCheckout.isPending}>
+              {verifyCheckout.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Verify My Payment
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                localStorage.removeItem(PENDING_CHECKOUT_KEY)
+                setPendingCheckout(null)
+              }}
+            >
+              Dismiss
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-blue-600" />
+              <CreditCard className="h-5 w-5 text-accent" />
               <CardTitle className="text-base">Current Plan</CardTitle>
             </div>
             <Badge variant={STATUS_VARIANTS[subscription?.status] || 'secondary'}>
@@ -163,7 +251,7 @@ export default function SubscriptionSettingsPage() {
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
-                <Button onClick={() => setShowChangePlan(true)}>
+                <Button onClick={() => setShowChangePlan(true)} disabled={!!pendingCheckout}>
                   Change Plan
                 </Button>
                 {subscription.plan !== 'FREE' && subscription.status === 'ACTIVE' && (
@@ -182,8 +270,8 @@ export default function SubscriptionSettingsPage() {
       {showChangePlan && subscription && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Change Plan</CardTitle>
-            <CardDescription>Select a new plan and billing cycle</CardDescription>
+            <CardTitle className="text-base">Choose a Plan</CardTitle>
+            <CardDescription>Select a plan and billing cycle, then pay securely via your preferred provider</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -203,41 +291,80 @@ export default function SubscriptionSettingsPage() {
                   Yearly
                 </Button>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {Object.entries(PLAN_PRICES).map(([planKey, prices]) => {
-                  const isCurrent = subscription.plan === planKey && subscription.billingCycle === selectedCycle
-                  const price = selectedCycle === 'MONTHLY' ? prices.monthly : prices.yearly
-                  return (
-                    <button
-                      key={planKey}
-                      onClick={() => setSelectedPlan(planKey)}
-                      className={`text-left p-4 rounded-lg border-2 transition-colors ${
-                        selectedPlan === planKey
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                          : isCurrent
-                          ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
-                      }`}
-                    >
-                      <p className="font-semibold text-gray-900 dark:text-white">{PLAN_LABELS[planKey]}</p>
-                      <p className="text-lg font-bold text-gray-900 dark:text-white mt-1">
-                        {formatCurrency(price / 100, currency)}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        /{selectedCycle === 'MONTHLY' ? 'month' : 'year'}
-                      </p>
-                      {isCurrent && <Badge variant="success" className="mt-2">Current</Badge>}
-                    </button>
-                  )
-                })}
+
+              {plansLoading && <div className="flex justify-center py-6"><Spinner /></div>}
+
+              {!plansLoading && planPricing && planPricing.length > 0 && (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {planPricing
+                    .filter((p) => p.billingCycle === selectedCycle && p.isActive)
+                    .map((p) => {
+                      const isCurrent = subscription.plan === p.plan && subscription.billingCycle === p.billingCycle
+                      const selected = selectedPlan === p.plan
+                      return (
+                        <button
+                          key={`${p.plan}-${p.billingCycle}`}
+                          onClick={() => setSelectedPlan(p.plan)}
+                          className={`text-left p-4 rounded-lg border-2 transition-colors ${
+                            selected
+                              ? 'border-accent bg-accent/10'
+                              : isCurrent
+                              ? 'border-green-500 bg-green-50 dark:bg-green-900/20 cursor-default'
+                              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          <p className="font-semibold text-gray-900 dark:text-white">{PLAN_LABELS[p.plan] || p.plan}</p>
+                          <p className="text-lg font-bold text-gray-900 dark:text-white mt-1">
+                            {formatCurrency(p.price / 100, currency)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            /{selectedCycle === 'MONTHLY' ? 'month' : 'year'}
+                          </p>
+                          {p.smsCredits > 0 && <p className="text-xs text-gray-500 mt-1">{p.smsCredits} SMS credits</p>}
+                          {p.whatsappCredits > 0 && <p className="text-xs text-gray-500">{p.whatsappCredits} WhatsApp credits</p>}
+                          {isCurrent && <Badge variant="success" className="mt-2">Current</Badge>}
+                        </button>
+                      )
+                    })}
+                </div>
+              )}
+
+              {!plansLoading && planPricing && planPricing.length === 0 && (
+                <p className="text-sm text-gray-500">No pricing configured yet. Please contact support.</p>
+              )}
+
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium mb-2">Pay with</p>
+                <div className="flex gap-2">
+                  <Button
+                    variant={selectedProvider === 'PAYSTACK' ? 'primary' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedProvider('PAYSTACK')}
+                  >
+                    Paystack
+                  </Button>
+                  <Button
+                    variant={selectedProvider === 'FLUTTERWAVE' ? 'primary' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedProvider('FLUTTERWAVE')}
+                  >
+                    Flutterwave
+                  </Button>
+                </div>
               </div>
+
               <div className="flex gap-3">
                 <Button
-                  onClick={() => changePlan.mutate()}
-                  disabled={!selectedPlan || changePlan.isPending || selectedPlan === subscription.plan && selectedCycle === subscription.billingCycle}
+                  onClick={() => checkout.mutate()}
+                  disabled={!selectedPlan || checkout.isPending || (selectedPlan === subscription.plan && selectedCycle === subscription.billingCycle && subscription.status === 'ACTIVE')}
                 >
-                  {changePlan.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                  {subscription.plan === 'FREE' ? 'Upgrade' : selectedPlan === 'FREE' ? 'Downgrade' : 'Change Plan'}
+                  {checkout.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                  {selectedPlan === 'FREE'
+                    ? 'Switch to Free'
+                    : subscription.plan === 'FREE'
+                    ? 'Proceed to Payment'
+                    : 'Pay & Upgrade'}
+                  <ExternalLink className="h-4 w-4 ml-1" />
                 </Button>
                 <Button variant="outline" onClick={() => setShowChangePlan(false)}>Cancel</Button>
               </div>

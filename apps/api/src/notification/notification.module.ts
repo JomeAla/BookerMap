@@ -1,8 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MarketingModule } from '../marketing/marketing.module';
 import { GatewayModule } from '../gateway/gateway.module';
+import { PaymentModule } from '../payment/payment.module';
 import { NotificationController } from './notification.controller';
 import { BulkSmsController } from './bulk-sms.controller';
 import { SmsTemplateController } from './sms-template.controller';
@@ -21,7 +22,7 @@ import { ReminderCronService } from './reminder-cron.service';
 import { BulkSmsService } from './bulk-sms.service';
 
 @Module({
-  imports: [ConfigModule, ScheduleModule.forRoot(), MarketingModule, GatewayModule],
+  imports: [ConfigModule, ScheduleModule.forRoot(), forwardRef(() => MarketingModule), forwardRef(() => GatewayModule), forwardRef(() => PaymentModule)],
   controllers: [NotificationController, BulkSmsController, SmsTemplateController, WhatsAppTemplateController],
   providers: [
     NotificationService,

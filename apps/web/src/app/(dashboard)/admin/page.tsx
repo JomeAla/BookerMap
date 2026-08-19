@@ -349,6 +349,15 @@ export default function AdminPlatformPage() {
   const [creditGrant, setCreditGrant] = React.useState({ tenantId: '', amount: 100, description: '' })
   const [settingsTab, setSettingsTab] = React.useState('sms')
   const [planPricing, setPlanPricing] = React.useState<Array<{ id: string; plan: string; billingCycle: string; price: number; smsCredits: number; whatsappCredits: number; features: any; isActive: boolean }>>([])
+  const [paySettings, setPaySettings] = React.useState<{
+    paystackPublicKey: string; paystackSecretKey: string; paystackWebhookSecret: string
+    flutterwavePublicKey: string; flutterwaveSecretKey: string; flutterwaveEncryptionKey: string; flutterwaveWebhookSecret: string
+    defaultCurrency: string; isActive: boolean
+  }>({
+    paystackPublicKey: '', paystackSecretKey: '', paystackWebhookSecret: '',
+    flutterwavePublicKey: '', flutterwaveSecretKey: '', flutterwaveEncryptionKey: '', flutterwaveWebhookSecret: '',
+    defaultCurrency: 'NGN', isActive: true,
+  })
 
   const { data: platformSettings, isLoading: settingsLoading } = useQuery({
     queryKey: ['platform-sms-settings'],
@@ -429,6 +438,79 @@ export default function AdminPlatformPage() {
     mutationFn: () => api.post('/plan-pricing/seed'),
     onSuccess: () => { toast({ title: 'Default plans seeded', variant: 'success' }); queryClient.invalidateQueries({ queryKey: ['plan-pricing'] }) },
     onError: (err: any) => toast({ title: err?.response?.data?.message || 'Error seeding plans', variant: 'destructive' }),
+  })
+
+  // Platform payment settings (Paystack/Flutterwave for subscriptions + SMS credit purchases)
+  const { data: platformPaySettings, isLoading: paySettingsLoading } = useQuery({
+    queryKey: ['platform-payment-settings'],
+    queryFn: async () => { const { data } = await api.get('/platform/payment-settings'); return data },
+    enabled: tab === 'payments',
+  })
+
+  const { data: platformRevenue, isLoading: revenueLoading } = useQuery({
+    queryKey: ['platform-revenue'],
+    queryFn: async () => { const { data } = await api.get('/platform/payment-settings/revenue'); return data },
+    enabled: tab === 'payments',
+  })
+
+  React.useEffect(() => {
+    if (platformPaySettings?.data) {
+      const s = platformPaySettings.data
+      setPaySettings(prev => ({
+        ...prev,
+        paystackPublicKey: s.paystackPublicKey || prev.paystackPublicKey,
+        paystackSecretKey: s.paystackSecretKey ? (s.paystackSecretKey === '••••••••' ? '' : s.paystackSecretKey) : '',
+        paystackWebhookSecret: s.paystackWebhookSecret ? (s.paystackWebhookSecret === '••••••••' ? '' : s.paystackWebhookSecret) : '',
+        flutterwavePublicKey: s.flutterwavePublicKey || prev.flutterwavePublicKey,
+        flutterwaveSecretKey: s.flutterwaveSecretKey ? (s.flutterwaveSecretKey === '••••••••' ? '' : s.flutterwaveSecretKey) : '',
+        flutterwaveEncryptionKey: s.flutterwaveEncryptionKey ? (s.flutterwaveEncryptionKey === '••••••••' ? '' : s.flutterwaveEncryptionKey) : '',
+        flutterwaveWebhookSecret: s.flutterwaveWebhookSecret ? (s.flutterwaveWebhookSecret === '••••••••' ? '' : s.flutterwaveWebhookSecret) : '',
+        defaultCurrency: s.defaultCurrency || prev.defaultCurrency,
+        isActive: s.isActive ?? prev.isActive,
+      }))
+    }
+  }, [platformPaySettings])
+
+  const savePaystackSettings = useMutation({
+    mutationFn: () => api.post('/platform/payment-settings/paystack', {
+      paystackPublicKey: paySettings.paystackPublicKey,
+      paystackSecretKey: paySettings.paystackSecretKey,
+      paystackWebhookSecret: paySettings.paystackWebhookSecret,
+    }),
+    onSuccess: () => { toast({ title: 'Paystack credentials saved', variant: 'success' }); queryClient.invalidateQueries({ queryKey: ['platform-payment-settings'] }) },
+    onError: (err: any) => toast({ title: err?.response?.data?.message || 'Error saving Paystack credentials', variant: 'destructive' }),
+  })
+
+  const saveFlutterwaveSettings = useMutation({
+    mutationFn: () => api.post('/platform/payment-settings/flutterwave', {
+      flutterwavePublicKey: paySettings.flutterwavePublicKey,
+      flutterwaveSecretKey: paySettings.flutterwaveSecretKey,
+      flutterwaveEncryptionKey: paySettings.flutterwaveEncryptionKey,
+      flutterwaveWebhookSecret: paySettings.flutterwaveWebhookSecret,
+    }),
+    onSuccess: () => { toast({ title: 'Flutterwave credentials saved', variant: 'success' }); queryClient.invalidateQueries({ queryKey: ['platform-payment-settings'] }) },
+    onError: (err: any) => toast({ title: err?.response?.data?.message || 'Error saving Flutterwave credentials', variant: 'destructive' }),
+  })
+
+  const saveGeneralSettings = useMutation({
+    mutationFn: () => api.post('/platform/payment-settings/general', {
+      defaultCurrency: paySettings.defaultCurrency,
+      isActive: paySettings.isActive,
+    }),
+    onSuccess: () => { toast({ title: 'General payment settings saved', variant: 'success' }); queryClient.invalidateQueries({ queryKey: ['platform-payment-settings'] }) },
+    onError: (err: any) => toast({ title: err?.response?.data?.message || 'Error saving general settings', variant: 'destructive' }),
+  })
+
+  const validatePaystack = useMutation({
+    mutationFn: () => api.post('/platform/payment-settings/validate', { provider: 'PAYSTACK' }),
+    onSuccess: (res: any) => toast({ title: res.data?.message || 'Paystack connected', variant: 'success' }),
+    onError: (err: any) => toast({ title: err?.response?.data?.message || 'Paystack connection failed', variant: 'destructive' }),
+  })
+
+  const validateFlutterwave = useMutation({
+    mutationFn: () => api.post('/platform/payment-settings/validate', { provider: 'FLUTTERWAVE' }),
+    onSuccess: (res: any) => toast({ title: res.data?.message || 'Flutterwave connected', variant: 'success' }),
+    onError: (err: any) => toast({ title: err?.response?.data?.message || 'Flutterwave connection failed', variant: 'destructive' }),
   })
 
   // Escalations / Alerts
@@ -539,6 +621,7 @@ export default function AdminPlatformPage() {
           <TabsTrigger value="subscriptions"><CreditCard className="h-4 w-4 mr-1" /> Subscriptions</TabsTrigger>
           <TabsTrigger value="messaging"><MessageSquare className="h-4 w-4 mr-1" /> SMS & WhatsApp</TabsTrigger>
           <TabsTrigger value="pricing"><Coins className="h-4 w-4 mr-1" /> Pricing</TabsTrigger>
+          <TabsTrigger value="payments"><Globe className="h-4 w-4 mr-1" /> Payments</TabsTrigger>
           <Link href="/admin/editor" className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-gray-800 transition-colors">
             <Globe className="h-4 w-4" /> Editor
           </Link>
@@ -1667,6 +1750,187 @@ export default function AdminPlatformPage() {
               <PlanPricingForm onSubmit={(dto) => savePlanPricing.mutate(dto)} isLoading={savePlanPricing.isPending} />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* PAYMENTS TAB */}
+        <TabsContent value="payments" className="space-y-6 mt-4">
+          {paySettingsLoading && <div className="flex justify-center py-8"><Spinner /></div>}
+
+          {!paySettingsLoading && (
+            <>
+              {/* Revenue snapshot */}
+              <Card>
+                <CardHeader><CardTitle className="text-base flex items-center gap-2"><TrendingUp className="h-5 w-5 text-accent" /> Platform Revenue Snapshot</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  {revenueLoading ? (
+                    <div className="flex justify-center py-6"><Spinner /></div>
+                  ) : platformRevenue?.data ? (
+                    <>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800">
+                          <p className="text-sm text-gray-500">Subscription Revenue</p>
+                          <p className="text-xl font-bold mt-1">{formatCurrency(platformRevenue.data.subscriptionRevenue || 0, paySettings.defaultCurrency)}</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800">
+                          <p className="text-sm text-gray-500">SMS Credit Revenue</p>
+                          <p className="text-xl font-bold mt-1">{formatCurrency(platformRevenue.data.creditRevenue || 0, paySettings.defaultCurrency)}</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800">
+                          <p className="text-sm text-gray-500">Total Revenue</p>
+                          <p className="text-xl font-bold mt-1">{formatCurrency(platformRevenue.data.totalRevenue || 0, paySettings.defaultCurrency)}</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800">
+                          <p className="text-sm text-gray-500">Successful Payments</p>
+                          <p className="text-xl font-bold mt-1">{((platformRevenue.data.subscriptionCount || 0) + (platformRevenue.data.creditCount || 0)).toLocaleString()}</p>
+                        </div>
+                      </div>
+
+                      {platformRevenue.data.recentPayments && platformRevenue.data.recentPayments.length > 0 && (
+                        <div>
+                          <h3 className="font-medium text-sm mb-2">Recent Payments</h3>
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Tenant</TableHead>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead>Amount</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead>Provider</TableHead>
+                                  <TableHead>Date</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {platformRevenue.data.recentPayments.map((p: any) => (
+                                  <TableRow key={p.id}>
+                                    <TableCell className="font-medium">{p.tenantName || '—'}</TableCell>
+                                    <TableCell className="capitalize">{p.type}</TableCell>
+                                    <TableCell>{formatCurrency(p.amount, paySettings.defaultCurrency)}</TableCell>
+                                    <TableCell><Badge variant={p.status === 'SUCCESS' || p.status === 'PAID' ? 'success' : 'secondary'}>{p.status}</Badge></TableCell>
+                                    <TableCell className="uppercase">{p.provider}</TableCell>
+                                    <TableCell>{formatDate(p.createdAt)}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-6 text-gray-400">No revenue data available.</div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Paystack credentials */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <span className="flex items-center gap-2">Paystack Credentials</span>
+                    <Badge variant={paySettings.paystackPublicKey ? 'success' : 'secondary'}>{paySettings.paystackPublicKey ? 'Configured' : 'Not configured'}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-gray-500">Platform-level Paystack keys used for tenant subscription billing and SMS credit purchases.</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Public Key</label>
+                      <Input value={paySettings.paystackPublicKey} onChange={(e) => setPaySettings({ ...paySettings, paystackPublicKey: e.target.value })} placeholder="pk_live_xxxxxxxx" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Secret Key</label>
+                      <Input type="password" value={paySettings.paystackSecretKey} onChange={(e) => setPaySettings({ ...paySettings, paystackSecretKey: e.target.value })} placeholder="••••••••" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Webhook Secret</label>
+                      <Input type="password" value={paySettings.paystackWebhookSecret} onChange={(e) => setPaySettings({ ...paySettings, paystackWebhookSecret: e.target.value })} placeholder="••••••••" />
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button onClick={() => savePaystackSettings.mutate()} disabled={savePaystackSettings.isPending || !paySettings.paystackSecretKey}>
+                      {savePaystackSettings.isPending ? 'Saving...' : 'Save Paystack Keys'}
+                    </Button>
+                    <Button variant="outline" onClick={() => validatePaystack.mutate()} disabled={validatePaystack.isPending}>
+                      {validatePaystack.isPending ? 'Checking...' : 'Validate Connection'}
+                    </Button>
+                  </div>
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg text-sm text-gray-500">
+                    <strong>Paystack Webhook URL:</strong><br />
+                    <code className="text-xs break-all">{typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/payments/webhooks/paystack</code>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Flutterwave credentials */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <span className="flex items-center gap-2">Flutterwave Credentials</span>
+                    <Badge variant={paySettings.flutterwavePublicKey ? 'success' : 'secondary'}>{paySettings.flutterwavePublicKey ? 'Configured' : 'Not configured'}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Public Key</label>
+                      <Input value={paySettings.flutterwavePublicKey} onChange={(e) => setPaySettings({ ...paySettings, flutterwavePublicKey: e.target.value })} placeholder="FLWPUBK-xxxxxxxx" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Secret Key</label>
+                      <Input type="password" value={paySettings.flutterwaveSecretKey} onChange={(e) => setPaySettings({ ...paySettings, flutterwaveSecretKey: e.target.value })} placeholder="••••••••" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Encryption Key</label>
+                      <Input type="password" value={paySettings.flutterwaveEncryptionKey} onChange={(e) => setPaySettings({ ...paySettings, flutterwaveEncryptionKey: e.target.value })} placeholder="••••••••" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Webhook Secret (Hash)</label>
+                      <Input type="password" value={paySettings.flutterwaveWebhookSecret} onChange={(e) => setPaySettings({ ...paySettings, flutterwaveWebhookSecret: e.target.value })} placeholder="••••••••" />
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button onClick={() => saveFlutterwaveSettings.mutate()} disabled={saveFlutterwaveSettings.isPending || !paySettings.flutterwaveSecretKey}>
+                      {saveFlutterwaveSettings.isPending ? 'Saving...' : 'Save Flutterwave Keys'}
+                    </Button>
+                    <Button variant="outline" onClick={() => validateFlutterwave.mutate()} disabled={validateFlutterwave.isPending}>
+                      {validateFlutterwave.isPending ? 'Checking...' : 'Validate Connection'}
+                    </Button>
+                  </div>
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg text-sm text-gray-500">
+                    <strong>Flutterwave Webhook URL:</strong><br />
+                    <code className="text-xs break-all">{typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/payments/webhooks/flutterwave</code>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* General settings */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">General Payment Settings</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Default Currency</label>
+                      <select className="w-full rounded-md border px-2 py-1.5 text-sm" value={paySettings.defaultCurrency} onChange={(e) => setPaySettings({ ...paySettings, defaultCurrency: e.target.value })}>
+                        {['NGN', 'GHS', 'KES', 'ZAR', 'UGX', 'TZS', 'RWF', 'USD', 'EUR', 'GBP'].map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <p className="text-xs text-gray-400 mt-1">Currency used for platform-wide subscription and credit pricing</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Status</label>
+                      <select className="w-full rounded-md border px-2 py-1.5 text-sm" value={paySettings.isActive ? 'active' : 'inactive'} onChange={(e) => setPaySettings({ ...paySettings, isActive: e.target.value === 'active' })}>
+                        <option value="active">Active — accept payments</option>
+                        <option value="inactive">Inactive — pause payments</option>
+                      </select>
+                    </div>
+                  </div>
+                  <Button onClick={() => saveGeneralSettings.mutate()} disabled={saveGeneralSettings.isPending}>
+                    {saveGeneralSettings.isPending ? 'Saving...' : 'Save General Settings'}
+                  </Button>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
       </Tabs>
     </div>

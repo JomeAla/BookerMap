@@ -40,6 +40,21 @@ export class FlutterwaveService implements PaymentProvider {
     return { secretKey: fallback };
   }
 
+  private async resolvePlatformCredentials(): Promise<{ secretKey: string; encryptionKey?: string }> {
+    const settings = await this.prisma.platformPaymentSettings.findFirst();
+    if (settings?.flutterwaveSecretKey && settings.isActive) {
+      return {
+        secretKey: decrypt(settings.flutterwaveSecretKey),
+        encryptionKey: settings.flutterwaveEncryptionKey ? decrypt(settings.flutterwaveEncryptionKey) : undefined,
+      };
+    }
+    const fallback = this.configService.get<string>('FLUTTERWAVE_SECRET_KEY');
+    if (!fallback) {
+      throw new HttpException('Flutterwave not configured for the platform', 400);
+    }
+    return { secretKey: fallback };
+  }
+
   private handleError(error: unknown, defaultMessage: string): never {
     if (error instanceof AxiosError) {
       this.logger.error(`Flutterwave API error: ${error.message}`, error.response?.data);
@@ -89,6 +104,73 @@ export class FlutterwaveService implements PaymentProvider {
       Authorization: `Bearer ${secretKey}`,
       'Content-Type': 'application/json',
     };
+  }
+
+  private async getPlatformAuthHeaders(): Promise<Record<string, string>> {
+    const { secretKey } = await this.resolvePlatformCredentials();
+    return {
+      Authorization: `Bearer ${secretKey}`,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  async initializePlatformPayment(
+    email: string,
+    amount: number,
+    metadata: any,
+  ): Promise<{ authorizationUrl: string; reference: string; accessCode?: string }> {
+    const headers = await this.getPlatformAuthHeaders();
+    const txRef = `BMR-PF-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
+
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/charges?type=card`,
+        {
+          tx_ref: txRef,
+          amount,
+          currency: metadata.currency || 'NGN',
+          email,
+          redirect_url: metadata.redirectUrl || undefined,
+          meta: { ...metadata, isPlatformPayment: true },
+          customer: {
+            email,
+            name: metadata.customerName || email,
+          },
+          customizations: {
+            title: metadata.title || 'BookerMap Subscription',
+            description: metadata.description || '',
+          },
+        },
+        { headers },
+      );
+
+      const data = response.data.data;
+      return {
+        authorizationUrl: data.link || data.redirect_url || data.meta?.authorization?.redirect,
+        reference: txRef,
+        accessCode: data.meta?.authorization?.mode === 'redirect' ? data.meta.authorization.redirect : undefined,
+      };
+    } catch (error) {
+      this.handleError(error, 'Payment initialization failed');
+    }
+  }
+
+  async verifyPlatformPayment(
+    reference: string,
+  ): Promise<{ status: string; amount: number; currency: string; customer: any }> {
+    const headers = await this.getPlatformAuthHeaders();
+    try {
+      const response = await axios.get(`${this.baseUrl}/transactions/${reference}/verify`, { headers });
+      const data = response.data.data;
+      return {
+        status: data.status,
+        amount: data.amount,
+        currency: data.currency,
+        customer: data.customer,
+      };
+    } catch (error) {
+      this.handleError(error, 'Payment verification failed');
+    }
   }
 
   async initializePayment(

@@ -5,6 +5,7 @@ import { PricingService } from '../pricing/pricing.service';
 import { SchedulingService } from './scheduling.service';
 import { DispatchService } from '../dispatch/dispatch.service';
 import { BookingGateway } from '../gateway/booking.gateway';
+import { generateBookingReference } from '../common/utils/booking-reference';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { RescheduleBookingDto } from './dto/reschedule-booking.dto';
 
@@ -109,6 +110,7 @@ export class BookingService {
         intakeAnswers: intakeAnswers || undefined,
         totalPrice,
         status: 'PENDING',
+        reference: generateBookingReference(),
       },
       include: { service: true, customer: true, technician: true, location: true },
     });

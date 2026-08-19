@@ -32,6 +32,21 @@ export class PaystackService implements PaymentProvider {
     return { secretKey: fallback };
   }
 
+  private async resolvePlatformCredentials(): Promise<{ secretKey: string; webhookSecret?: string }> {
+    const settings = await this.prisma.platformPaymentSettings.findFirst();
+    if (settings?.paystackSecretKey && settings.isActive) {
+      return {
+        secretKey: decrypt(settings.paystackSecretKey),
+        webhookSecret: settings.paystackWebhookSecret || undefined,
+      };
+    }
+    const fallback = this.configService.get<string>('PAYSTACK_SECRET_KEY');
+    if (!fallback) {
+      throw new HttpException('Paystack not configured for the platform', 400);
+    }
+    return { secretKey: fallback };
+  }
+
   private getHeaders(secretKey: string) {
     return {
       Authorization: `Bearer ${secretKey}`,
@@ -75,6 +90,51 @@ export class PaystackService implements PaymentProvider {
       return { authorizationUrl: authorization_url, reference, accessCode: access_code };
     } catch (error) {
       this.handleError(error, 'Payment initialization failed');
+    }
+  }
+
+  async initializePlatformPayment(
+    email: string,
+    amount: number,
+    metadata: any,
+  ): Promise<{ authorizationUrl: string; reference: string; accessCode?: string }> {
+    const { secretKey } = await this.resolvePlatformCredentials();
+    const currency = metadata?.currency || 'NGN';
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/transaction/initialize`,
+        {
+          email,
+          amount: Math.round(amount * 100),
+          currency,
+          metadata: { ...metadata, isPlatformPayment: true },
+        },
+        { headers: this.getHeaders(secretKey) },
+      );
+      const { authorization_url, reference, access_code } = response.data.data;
+      return { authorizationUrl: authorization_url, reference, accessCode: access_code };
+    } catch (error) {
+      this.handleError(error, 'Payment initialization failed');
+    }
+  }
+
+  async verifyPlatformPayment(
+    reference: string,
+  ): Promise<{ status: string; amount: number; currency: string; customer: any }> {
+    const { secretKey } = await this.resolvePlatformCredentials();
+    try {
+      const response = await axios.get(`${this.baseUrl}/transaction/verify/${reference}`, {
+        headers: this.getHeaders(secretKey),
+      });
+      const data = response.data.data;
+      return {
+        status: data.status,
+        amount: data.amount / 100,
+        currency: data.currency,
+        customer: data.customer,
+      };
+    } catch (error) {
+      this.handleError(error, 'Payment verification failed');
     }
   }
 

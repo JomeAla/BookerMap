@@ -114,7 +114,7 @@ export class PaymentController {
     if (result.status === 'success') {
       const updatedPayment = await this.paymentService.handlePaymentSuccess(
         payment.id,
-        payment.invoiceId,
+        payment.invoiceId!,
         tenantId,
         result.customer,
       );
@@ -212,7 +212,7 @@ export class PaymentController {
     if (payment && result.status === 'success') {
       await this.paymentService.handlePaymentSuccess(
         payment.id,
-        payment.invoiceId,
+        payment.invoiceId!,
         tenantId,
       );
     }

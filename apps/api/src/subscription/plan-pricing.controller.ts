@@ -16,8 +16,7 @@ export class PlanPricingController {
   @ApiOperation({ summary: 'List all plan pricing' })
   @ApiResponse({ status: 200, description: 'List of plan pricing' })
   async listPlans() {
-    const data = await this.planPricingService.listPlans();
-    return { success: true, data };
+    return this.planPricingService.listPlans();
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -27,8 +26,7 @@ export class PlanPricingController {
   @ApiOperation({ summary: 'Create or update a plan pricing (admin only)' })
   @ApiResponse({ status: 201, description: 'Plan pricing upserted' })
   async upsertPlan(@Body() dto: UpsertPlanPricingDto) {
-    const data = await this.planPricingService.upsertPlan(dto);
-    return { success: true, data };
+    return this.planPricingService.upsertPlan(dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -38,8 +36,7 @@ export class PlanPricingController {
   @ApiOperation({ summary: 'Seed default plan pricing (admin only)' })
   @ApiResponse({ status: 201, description: 'Default plans seeded' })
   async seedDefaults() {
-    const data = await this.planPricingService.seedDefaults();
-    return { success: true, data };
+    return this.planPricingService.seedDefaults();
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -49,7 +46,6 @@ export class PlanPricingController {
   @ApiOperation({ summary: 'Delete a plan pricing (admin only)' })
   @ApiResponse({ status: 200, description: 'Plan pricing deleted' })
   async deletePlan(@Param('plan') plan: string, @Param('billingCycle') billingCycle: string) {
-    const data = await this.planPricingService.deletePlan(plan as any, billingCycle as any);
-    return { success: true, data };
+    return this.planPricingService.deletePlan(plan as any, billingCycle as any);
   }
 }

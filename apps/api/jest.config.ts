@@ -10,6 +10,8 @@ const config: Config = {
   collectCoverageFrom: ['**/*.(t|j)s'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
+  testTimeout: 30000,
+  maxWorkers: 1,
   moduleNameMapper: {
     '^@prisma/client$': '<rootDir>/../node_modules/@prisma/client',
   },

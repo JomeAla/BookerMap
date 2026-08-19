@@ -6,14 +6,14 @@
 - **Core Functionality**: Online booking, scheduling, dispatch, invoicing, and payments for home service businesses
 - **Target Market**: Africa (Nigeria, Ghana, Kenya, South Africa) with global capability
 - **Competitive Advantage**: Custom rule-based AI agent (no external API dependency) + African payment methods (Paystack/Flutterwave)
-- **Current Phase**: Pre-launch — core modules built, polishing remaining features
+- **Current Phase**: Pre-launch - core modules built (~90% complete), polishing remaining features. Plan docs reconciled with source code July 2026.
 
 ---
 
 ## Progress Legend
-- `[x]` — Complete
-- `[~]` — Partially built / needs finishing
-- `[ ]` — Not started
+- `[x]` - Complete
+- `[~]` - Partially built / needs finishing
+- `[ ]` - Not started
 
 ---
 
@@ -57,31 +57,31 @@
 - [x] Login with JWT tokens
 - [x] Refresh token mechanism
 - [x] Password reset flow (forgot + reset with email)
-- [ ] OAuth (Google, Microsoft) — optional
-- [ ] Two-factor authentication — optional
+- [x] OAuth (Google, Microsoft) — strategies fixed, callback URLs use env var
+- [x] Two-factor authentication — TOTP via speakeasy + setup page + backup codes
 
 ### 2.2 Tenant Management Module
 - [x] Tenant registration (business signup)
 - [x] Subdomain/slug setup
 - [x] Custom domain configuration — architecture supports it
 - [x] Tenant settings (branding, timezone, currency)
-- [ ] Subscription management — not started
+- [x] Subscription management — plans, billing cycles, invoices, frontend settings page
 
 ### 2.3 User & Team Module
 - [x] Team member invitation system
 - [x] Role management (Admin, Owner, Manager, Technician, Customer)
 - [x] Permission system (JwtAuthGuard + RolesGuard)
 - [x] Team member profiles
-- [ ] Availability management — not started
-- [ ] Skill tagging system — not started
+- [x] Availability management — weekly calendar editor + wired into booking/dispatch
+- [x] Skill tagging system — JSON field + autocomplete editor
 
 ### 2.4 Customer Module (CRM)
 - [x] Customer CRUD operations
 - [x] Customer addresses management
 - [x] Customer notes
 - [x] Customer history (past jobs via booking relation)
-- [ ] Customer tags and groups — not started
-- [ ] Import/export customers — not started
+- [x] Customer tags and groups — comma-separated, filter/sort/edit
+- [x] Import/export customers — CSV import/export
 
 ---
 
@@ -93,14 +93,14 @@
 - [x] Service pricing (flat, hourly, custom)
 - [x] Service modifiers (add-ons)
 - [x] Intake questions builder
-- [ ] Service images and attachments — not started
+- [x] Service images and attachments — PATCH endpoint + POST upload with multer
 
 ### 3.2 Territory Module
 - [x] Territory creation
 - [x] Geographic boundary definition (Json field)
 - [x] Territory-specific pricing
 - [x] Territory-specific services
-- [ ] Territory availability settings — not started
+- [x] Territory availability settings - per-territory hours JSON + availability logic wired into BookingService.create
 
 ### 3.3 Booking Module
 - [x] Online booking widget (4-step: service → time → info → confirm)
@@ -116,18 +116,18 @@
 - [x] Calendar view (day, week, month) — month grid, week timeline, day vertical
 - [x] Time slot generation (30-min intervals, 8am-5pm)
 - [x] Buffer time between jobs
-- [ ] Drive-time calculation — not started
+- [x] Drive-time calculation — haversine formula in scheduling engine
 - [x] Overbooking prevention
 - [x] Conflict detection
 
 ### 3.5 Dispatch Module
 - [x] Job assignment interface
-- [ ] Auto-assignment rules — not started
-- [ ] Job offer system (techs claim jobs) — not started
+- [x] Auto-assignment rules — skills + load balancing
+- [x] Job offer system (techs claim jobs) — offer/accept flow
 - [x] Job status tracking (assigned, en-route, started, completed)
 - [x] Technician job view
   - [x] Route optimization — dispatches list + route optimization panel consuming POST /routing/optimize
-- [ ] Real-time location tracking — optional
+- [x] Real-time location tracking - DONE (location gateway via Socket.io, LocationUpdate model, tracking page with Leaflet map + live markers + route polyline)
 
 ---
 
@@ -138,8 +138,8 @@
 - [x] Line items management
 - [x] Tax calculation
 - [x] Discount application
-- [ ] Invoice templates — not started
-- [ ] PDF generation — not started
+- [x] Invoice templates — PDF generation via pdfkit, download endpoint
+- [x] PDF generation — pdfkit with A4 layout, tables, totals
 - [x] Invoice sending (via EmailService)
 
 ### 4.2 Paystack Integration
@@ -147,10 +147,10 @@
 - [x] Transaction initialization
 - [x] Payment verification webhook
 - [x] Customer creation
-- [ ] Saved cards (tokenization) — not started
-- [ ] Recurring charges — not started
+- [x] Saved cards (tokenization) — SavedCard model + CardService + UI
+- [x] Recurring charges (Paystack) - DONE (RecurringPaymentService with @Cron(EVERY_HOUR), processes due payments via chargeCustomer, creates invoice + payment + log)
 - [x] Refunds handling
-- [ ] Dispute management — not started
+- [x] Dispute management — full CRUD, evidence, resolution with auto-refund
 
 ### 4.3 Flutterwave Integration
 - [x] OAuth token management
@@ -159,7 +159,7 @@
 - [x] Charge initiation
 - [x] 3DS/OTP handling
 - [x] Webhook processing
-- [ ] Recurring payments — not started
+- [x] Recurring payments (Flutterwave) - DONE (RecurringPaymentService processes Flutterwave charges; same cron as Paystack)
 - [x] Transfers to providers
 
 ### 4.4 Payment Module (Unified)
@@ -167,8 +167,8 @@
 - [x] Payment method selection (Paystack/Flutterwave)
 - [x] Currency handling
 - [x] Fee calculation
-- [ ] Settlement tracking — not started
-- [ ] Payment reporting — not started
+- [x] Settlement tracking — SettlementCronService daily reconciliation, admin UI with process/complete/fail
+- [x] Payment reporting - DONE (GET /reports/payment-methods endpoint + payment-method-breakdown card on Reports page with provider revenue/fees/transactions/percentage)
 
 ### 4.5 Tenant Payment Configuration (Admin Panel)
 - [x] Settings page for payment credentials
@@ -189,21 +189,30 @@
 - [x] Feedback request emails
 - [x] Password reset emails
 - [x] Reminder emails — ReminderCronService runs hourly via @nestjs/schedule
-- [ ] Team notifications — not started
+- [x] Team notifications — batch by user list, multi-select + dialog
 
 ### 5.2 SMS Notifications
-- [~] SMS gateway service (SmsService exists, uses stub/console)
-- [ ] SMS templates — not started
-- [~] Booking confirmation SMS — stub exists
-- [~] Booking reminder SMS — stub exists
-- [ ] Bulk SMS — not started
-- [ ] SMS delivery tracking — not started
+- [x] SMS gateway service (SmsService with NigeriaBulkSMS SDK integration)
+- [x] SMS provider integration — NigeriaBulkSMS platform-level credentials, tenants purchase credits
+- [x] Platform admin SMS gateway credentials UI (Messaging tab in admin panel)
+- [x] Tenant SMS credit system (SmsCredit model, balance tracking, admin grant, per-message deduction with dynamic pricing)
+- [x] SMS templates - DONE (SmsTemplate model + CRUD service/controller + renderTemplate + wired into SmsService.sendBookingConfirmation/Reminder/EnRoute + frontend CRUD page)
+- [x] Booking confirmation SMS — wired through SmsService
+- [x] Booking reminder SMS — ReminderCronService sends SMS + email with dedup
+- [x] Bulk SMS campaigns — BulkSmsCampaign/Recipient models, segment filtering, credit deduction
+- [x] SMS delivery tracking — delivery receipt webhook endpoint updates Notification status
+- [x] Notification retry mechanism — WebhookDelivery model, 15-min cron, exponential backoff (max 5)
 
-### 5.3 Push Notifications
-- [ ] Push notification setup — not started
+### 5.3 WhatsApp Integration
+- [x] WhatsApp Business API integration — Meta API with platform-level credentials (accessToken, phoneNumberId, businessId)
+- [x] Platform admin WhatsApp credentials UI (Messaging tab in admin panel)
+- [x] WhatsApp delivery tracking — Meta webhook parsing, persist delivery status per message
+- [x] WhatsApp message templates - DONE (WhatsAppTemplate Prisma model + CRUD service/controller + render with {{1}} placeholders + frontend admin UI at /notifications/whatsapp-templates)
+
+### 5.4 Push Notifications
+- [x] Browser push notifications — WebPushService, PushSubscription model, VAPID keys, 3 controller endpoints, PWA subscription
+- [x] Mobile push notifications — MobilePushService (Firebase Admin SDK), MobileDevice model, device registration, broadcast endpoint
 - [x] In-app notifications — NotificationPanel dropdown + /notifications page with filter/pagination
-- [ ] Browser push notifications — not started
-- [ ] Mobile push notifications — not started
 
 ---
 
@@ -219,7 +228,7 @@
 ### 6.2 AI Chat Interface
 - [x] Chat backend API (POST /ai/chat)
 - [x] Chat widget UI on customer-facing pages — floating chat on /booking/[tenantSlug] and /portal
-- [ ] Chat history viewer — not started
+- [x] Chat history viewer - DONE (/ai/history page with conversation list + expandable messages, fetches /ai/conversations and /ai/conversations/:id/messages)
 - [x] Typing indicators — spinner while AI responds
 - [x] Quick reply buttons — rendered after assistant messages
 
@@ -227,7 +236,7 @@
 - [x] Booking creation via chat (looks up service, creates customer)
 - [x] Booking cancellation via chat
 - [x] Booking rescheduling via chat
-- [ ] Invoice payment initiation via chat — not started
+- [x] Invoice payment initiation via chat - DONE (PaymentHandler.handlePaymentIntent/handlePaymentConfirmation wired into chat.service.ts + task-executor.service.ts)
 - [x] Appointment status queries
 - [x] FAQ responses (custom trigger/response)
 
@@ -235,14 +244,14 @@
 - [x] Response templates editor (settings/ai page)
 - [x] Custom FAQ builder
 - [x] AI behavior settings (language, response style)
-- [ ] Response time configuration — not started
-- [ ] Conversation flow builder — not started
+- [x] Response time configuration - DONE (enableResponseDelay/responseDelayMs/enableTypingIndicator/typingDurationMs in AiSettingsDto; delay applied in ai-agent.controller.ts chat())
+- [x] Conversation flow builder — visual drag-and-drop ReactFlow editor + execution engine
 
 ### 6.5 AI Analytics
 - [x] Conversation tracking (stats, resolution rate, avg duration)
 - [x] Common queries analysis (top intents with count)
 - [x] Failed/unresolved conversation detection
-- [ ] Customer satisfaction tracking — not started
+- [x] Customer satisfaction tracking — SatisfactionSurvey sentiment fields, SentimentService, 4-tab dashboard
 
 ---
 
@@ -252,7 +261,7 @@
 - [x] Public booking page (/booking/[tenantSlug])
 - [x] Customer portal (view bookings at /portal)
 - [x] Cancellation/rescheduling flow (via AI chat)
-- [ ] Embedded booking widget (iframe/script) — not started
+- [x] Embedded booking widget (script tag) — widget.js + iframe + postMessage API
 
 ### 7.2 Admin Dashboard
 - [x] Dashboard overview (stats + recent bookings + AI insights)
@@ -270,8 +279,8 @@
 - [x] Job details
 - [x] Status updates (En Route → Start → Complete → Cancel)
 - [x] Customer info
-- [ ] Navigation integration — not started
-- [ ] Availability settings — not started
+- [x] Navigation integration - DONE (RoutingService.getRoute() via OSRM + GET /routing/route endpoint + NavigationPanel component with Leaflet map, route polyline, turn-by-turn steps, active step tracking, ETA/distance + Navigate button on technician job cards)
+- [x] Availability settings — weekly calendar editor + wired into booking/dispatch
 
 ---
 
@@ -282,7 +291,7 @@
 - [x] 12 supported events (booking.*, invoice.*, payment.*, customer.*)
 - [x] HMAC-SHA256 signed dispatch
 - [x] Webhook management UI (backend controller exists)
-- [ ] Webhook management UI in admin panel — frontend not started
+- [x] Webhook management UI in admin panel — CRUD + test + external webhook tool
 
 ---
 
@@ -296,94 +305,98 @@
 - [x] **Payment settings save** — Paystack/Flutterwave save, test, toggle all functional
 - [x] **Test suite** — 43 unit tests across auth (10), booking (17), invoice (16) all passing
 - [x] **Calendar week/day views** — proper day/week layouts with time-slot positioning
-- [ ] **Customer mobile app** — React Native app for booking + tracking
+- [ ] **Customer mobile app (React Native)** - no mobile project exists; largest remaining item
 - [x] **Google Calendar sync** — one-way sync (booking → Google Calendar) via OAuth 2.0, with connect/disconnect/sync in settings UI
-- [ ] **Review & rating system** — post-service feedback collection + public display
-- [ ] **Multi-location per tenant** — single business manages multiple branches
-- [ ] **Inventory management** — track materials/products used per job
-- [ ] **Commission tracking** — per-technician commission reports
-- [ ] **Automated marketing** — email campaigns for re-engaging lapsed customers
-- [ ] **WhatsApp integration** — booking confirmations/reminders via WhatsApp Business API
-- [ ] **POS / on-site payment** — Paystack Terminal / Flutterwave POS
-- [ ] **Dynamic pricing** — surge pricing for same-day, discounts for off-peak
-- [ ] **Technician availability settings**
-- [ ] **Service images upload**
-- [ ] **Embedded booking widget** (script tag for any website)
+- [x] **Review & rating system** � admin dashboard + public display + booking review form
+- [x] **Multi-location per tenant** � Service.locationId + location management page + filters
+- [x] **Inventory management** � full frontend page + stock adjustments + usage reporting
+- [x] **Commission tracking** — per-technician commission reports + team stat cards
+- [x] **Automated marketing** � campaign CRUD page + daily cron scheduler
+- [x] **WhatsApp integration** � Meta WhatsApp Business API with platform-level credentials, booking reminders via cron
+- [x] **POS / on-site payment** � Flutterwave POS API + Paystack terminals + POS dashboard page
+- [x] **Dynamic pricing** � pricing rules page + applyPricing wired into booking creation
+- [x] **Technician availability settings** � weekly calendar editor + wired into booking/dispatch
+- [x] **Service images upload** � multer disk storage
+- [x] **Embedded booking widget** (script tag for any website) � widget.js + iframe + postMessage API
 - [x] **Chat widget UI** on customer-facing pages
-- [ ] **Customer tags and groups**
-- [ ] **Import/export customers**
+- [x] **Customer tags and groups** � comma-separated, filter/sort/edit
+- [x] **Import/export customers** � CSV import/export
 - [x] **Invoice PDF generation**
-- [ ] **Webhook management UI** in admin panel
+- [x] **Webhook management UI** in admin panel � CRUD + test + external webhook tool
 - [x] **In-app notification viewer**
-- [ ] **Team notifications**
-- [ ] **Saved cards (tokenization)** for Paystack
-- [ ] **Subscription management** (tenant billing)
-- [ ] **Skill tagging** for technicians
-- [ ] **Auto-assignment rules** for dispatches
-- [ ] **Job offer system** (techs claim jobs)
-- [ ] **SMS/WhatsApp delivery tracking**
-- [ ] **Drive-time calculation** in scheduling
-- [ ] **Tenant custom domain setup**
-- [ ] **OAuth** (Google, Microsoft login)
-- [ ] **Two-factor authentication**
-- [ ] **Real-time location tracking** — technician GPS on map
-- [ ] **Settlement tracking** — reconcile payments with provider settlements
-- [ ] **Customer satisfaction tracking** — AI-powered sentiment analysis
-- [ ] **Public API** — rate-limited REST API for third-party integrations
-- [ ] **File management** — before/after photos, document storage per job
-- [ ] **Dispute management** — handle chargebacks and disputes
-- [ ] **Conversation flow builder** — visual editor for AI response flows
-- [ ] **PWA support** — installable mobile web app
+- [x] **Team notifications** � batch by user list, multi-select + dialog
+- [x] **Saved cards (tokenization)** for Paystack � SavedCard model + CardService + UI
+- [x] **Subscription management** (tenant billing) � plans, billing cycles, frontend page
+- [x] **Skill tagging** for technicians � JSON field + autocomplete editor
+- [x] **Auto-assignment rules** for dispatches � skills + load balancing
+- [x] **Job offer system** (techs claim jobs) � offer/accept flow
+- [x] **SMS provider integration** — NigeriaBulkSMS SDK, platform-level credentials, tenants purchase SMS credits
+- [x] **WhatsApp Business API integration** — Meta API, platform-level credentials, WhatsApp message sending
+- [x] **Platform admin SMS/WhatsApp credentials UI** — Messaging tab with SMS/WhatsApp settings + test connection + toggle
+- [x] **Tenant SMS credit system** — SmsCredit model, balance tracking, admin grants credits, per-message deduction with dynamic pricing
+- [x] **SMS delivery tracking** — delivery receipt webhooks update Notification status
+- [x] **Webhook delivery retry** — WebhookDelivery model with exponential backoff (2^attempts min, max 5), 15-min cron
+- [x] **Mobile push notifications** — MobilePushService (Firebase Admin SDK), device registration, broadcast, auto-deactivation of invalid tokens
+- [x] **Browser push notifications** — WebPushService, VAPID keys, PushSubscription model, subscription endpoints
+- [x] **Bulk SMS campaigns** — BulkSmsCampaign/Recipient models, segment filtering (ALL/TAG/RECENT), credit deduction, batch sending, delivery tracking
+- [x] **AI feedback/rating** — star rating widget in chat, /ai/feedback page with stats (avg rating, positive/negative %), rated message history
+- [x] **Sentiment analysis** — SatisfactionSurvey sentiment fields (score + label), SentimentService (rule-based with keyword matching + negation), 4-tab dashboard (trend, categories, keywords, feedback)
+- [x] **HTML email templates** — 12 branded templates with Handlebars substitution, inline CSS, responsive layout, plain-text fallbacks
+- [x] **Multi-currency support** — currency field on Invoice, CURRENCIES utility (NGN/KES/GHS/ZAR/USD/GBP/EUR), formatCurrency helper, tenant currency-config endpoint
+- [x] **Plan pricing system** — PlanPricing model with @@unique([plan, billingCycle]), 7 default plans seeded, admin UI for CRUD management
+- [x] **Dynamic SMS pricing** — smsPricePerUnit/whatsappPricePerUnit from PlatformSmsSettings, admin configurable per-unit pricing
+- [x] **Settlement cron** — SettlementCronService runs daily at 2am, reconciles Paystack/Flutterwave settlements with local records
+- [x] **Email service** — Nodemailer SMTP with 12 template methods + generic sendTemplate router, fallback to console logging
+- [x] **Drive-time calculation** in scheduling — haversine formula
+- [x] **Tenant custom domain setup** — add/verify/remove + DNS config UI
+- [x] **OAuth** (Google, Microsoft login) � strategies fixed, FRONTEND_URL env var
+- [x] **Two-factor authentication** � TOTP + setup page + backup codes
+- [x] **Real-time location tracking** - DONE (location gateway via Socket.io + tracking page with Leaflet map, live markers, route polyline)
+- [x] **Settlement tracking** — SettlementCronService daily reconciliation, admin UI with process/complete/fail
+- [x] **Customer satisfaction tracking** — SatisfactionSurvey sentiment fields, SentimentService, 4-tab dashboard
+- [x] **Public API** - DONE (public-api module with ApiKeyGuard, ApiThrottleGuard, scopes, 10+ endpoints: bookings, services, customers, availability, territories, technicians)
+- [x] **File management** � FilesModule with BookingFile model
+- [x] **Dispute management** � full CRUD + evidence + resolution with auto-refund
+- [x] **Conversation flow builder** � visual drag-and-drop ReactFlow editor + execution engine
+- [x] **PWA support** - DONE (manifest.json + sw.js service worker with cache-first/network-first strategies, offline fallback, push handler; /offline page)
+
+### Remaining (genuinely not started - verified July 2026)
+- [ ] **Customer mobile app (React Native)** - no mobile project exists; largest remaining item
+- [ ] **Payment testing with real API keys** - needs real Paystack/Flutterwave keys in Settings
+- [ ] **SSL** - deployment-level (Certbot per DEPLOYMENT.md)
+
+### Partially implemented (need finishing)
+*(All previously-partial items are now complete - July 2026)*
 
 ---
 
 ## Completed Features Summary
 
-### Backend (94 API endpoints across 13 modules)
+### Backend (100+ API endpoints across 43 controllers)
 | Module | Endpoints | Status |
 |--------|-----------|--------|
-| Auth | 7 | ✅ register, login, refresh, logout, forgot-password, reset-password, me |
-| Tenant | 4 | ✅ CRUD + slug lookup |
-| User | 5 | ✅ list, get, invite, update, delete |
-| Customer | 6 | ✅ CRUD + addresses |
-| Service | 8 | ✅ CRUD + categories + modifiers + intake fields |
-| Territory | 7 | ✅ CRUD + service linking |
-| Booking | 6 | ✅ CRUD + cancel + reschedule + available-slots |
-| Dispatch | 6 | ✅ CRUD + status + assign + technician lookup |
-| Invoice | 7 | ✅ CRUD + send + mark paid |
-| Payment | 11 | ✅ initialize, verify, refund, history + settings CRUD + 2 webhooks |
-| Notification | 5 | ✅ list, unread count, mark read, test email/sms |
-| Webhook | 6 | ✅ CRUD + events list + test |
-| AI Agent | 9 | ✅ chat, conversations, settings, responses, analytics |
-| **Total** | **94 endpoints** | |
+| Auth | 7 | ? register, login, refresh, logout, forgot-password, reset-password, me |
+| Tenant | 4 | ? CRUD + slug lookup + currency config |
+| User | 5 | ? list, get, invite, update, delete |
+| Customer | 6 | ? CRUD + addresses + import/export |
+| Service | 8 | ? CRUD + categories + modifiers + intake fields + location |
+| Territory | 7 | ? CRUD + service linking |
+| Booking | 6 | ? CRUD + cancel + reschedule + available-slots |
+| Dispatch | 6 | ? CRUD + status + assign + accept + route optimization |
+| Invoice | 7 | ? CRUD + send + PDF + mark paid |
+| Payment | 11 | ? initialize, verify, refund, history + settings CRUD + 2 webhooks + POS |
+| Notification | 20+ | ? SMS, WhatsApp, email, push, platform settings, credits, bulk SMS, webhooks, mobile push |
+| Webhook | 6 | ? CRUD + events list + test + delivery retry |
+| AI Agent | 9 | ? chat, conversations, settings, responses, analytics + feedback |
+| Satisfaction | 6 | ? CRUD + sentiment analysis + NPS |
+| Subscription | 4 | ? plan pricing CRUD + seed defaults |
+| Settlement | 4 | ? CRUD + reconciliation + daily cron |
+| Dispute | 5 | ? CRUD + evidence + resolution |
+| **Total** | **100+ endpoints** | |
 
-### Frontend (24 pages across 22 routes)
-| Route | Page | Status |
-|-------|------|--------|
-| `/` | Landing page | ✅ |
-| `/login` | Login | ✅ |
-| `/register` | Registration | ✅ |
-| `/forgot-password` | Forgot password | ✅ |
-| `/reset-password` | Reset password | ✅ |
-| `/dashboard` | Dashboard overview | ✅ |
-| `/bookings` | Bookings list | ✅ |
-| `/bookings/new` | New booking form | ✅ |
-| `/bookings/[id]` | Booking detail | ✅ |
-| `/calendar` | Calendar view | ✅ month view; ⏳ week/day |
-| `/customers` | Customers list | ✅ |
-| `/customers/[id]` | Customer detail | ✅ |
-| `/invoices` | Invoices list | ✅ |
-| `/invoices/[id]` | Invoice detail | ✅ |
-| `/notifications` | Notification list | ✅ |
-| `/services` | Services catalog | ✅ |
-| `/settings` | General settings | ✅ |
-| `/settings/team` | Team management | ✅ |
-| `/settings/ai` | AI agent settings | ✅ |
-| `/settings/payments` | Payment settings | ✅ |
-| `/portal` | Customer portal | ✅ |
-| `/technician` | Technician app | ✅ |
-| `/booking/[tenantSlug]` | Public booking widget | ✅ |
-| `/dispatches` | Dispatches list + route optimization | ✅ |
+
+### Frontend (69 pages across 60+ routes)
+All pages built and functional. Key routes: dashboard, bookings, calendar, customers, invoices, services, dispatches, marketing, notifications, reviews, satisfaction, disputes, settlements, inventory, settings (general/team/ai/payments/domain/coupons/webhooks/subscription/pricing/locations/security/api-keys/calendar), AI agent (chat/flows/history/feedback/escalations), admin (tenants/editor/subscriptions), reports, POS payment, split payments, recurring bookings, plus auth pages, customer portal, technician app, public booking widget, API docs.
 
 ---
 
@@ -442,5 +455,5 @@ Auth / Tenant (Core)
 
 ---
 
-*Plan Version: 2.0*
-*Last Updated: May 2026*
+*Last Updated: July 2026 (reconciled with source code; SMS templates, AI response time, territory availability, recurring charges, payment reporting, WhatsApp templates, multi-currency all complete)*
+*Plan Version: 7.0*

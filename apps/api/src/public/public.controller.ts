@@ -1,15 +1,23 @@
-import { Controller, Get, Post, Body, Param, Query, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { PublicService } from './public.service';
+import { CustomerOtpService } from './customer-otp.service';
+import { CustomerJwtAuthGuard } from '../common/guards/customer-jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PublicCreateBookingDto } from './dto/public-create-booking.dto';
+import { RequestOtpDto } from './dto/request-otp.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 
 @ApiTags('Public')
 @Throttle({ default: { limit: 10, ttl: 60000 } })
 @Controller('public')
 export class PublicController {
-  constructor(private publicService: PublicService) {}
+  constructor(
+    private publicService: PublicService,
+    private customerOtpService: CustomerOtpService,
+  ) {}
 
   @Get('stats')
   @ApiOperation({ summary: 'Get platform statistics', description: 'Returns public platform statistics (no auth required)' })
@@ -28,6 +36,13 @@ export class PublicController {
       return this.publicService.getTenantBySlug('');
     }
     return this.publicService.getTenantById(domainInfo.tenantId);
+  }
+
+  @Get('tenants')
+  @ApiOperation({ summary: 'List public tenants', description: 'Returns all active businesses on the platform' })
+  @ApiResponse({ status: 200, description: 'List of tenants' })
+  listTenants() {
+    return this.publicService.listTenants();
   }
 
   @Get('tenants/:slug')
@@ -116,5 +131,55 @@ export class PublicController {
     @Body() dto: PublicCreateBookingDto,
   ) {
     return this.publicService.createBooking(tenantSlug, dto);
+  }
+
+  @Get(':tenantSlug/bookings/:reference')
+  @ApiOperation({ summary: 'Look up a booking by reference', description: 'Returns a booking by its unique reference code (e.g. BM-XXXXXXX)' })
+  @ApiParam({ name: 'tenantSlug', type: String, description: 'Tenant slug' })
+  @ApiParam({ name: 'reference', type: String, description: 'Booking reference code' })
+  @ApiResponse({ status: 200, description: 'Booking details' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
+  getBookingByReference(
+    @Param('tenantSlug') tenantSlug: string,
+    @Param('reference') reference: string,
+  ) {
+    return this.publicService.getBookingByReference(tenantSlug, reference);
+  }
+
+  @Post(':tenantSlug/customers/otp')
+  @ApiOperation({ summary: 'Request a customer OTP', description: 'Requests a one-time verification code for the customer via SMS and/or email' })
+  @ApiParam({ name: 'tenantSlug', type: String, description: 'Tenant slug' })
+  @ApiResponse({ status: 201, description: 'OTP sent' })
+  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  requestOtp(
+    @Param('tenantSlug') tenantSlug: string,
+    @Body() dto: RequestOtpDto,
+  ) {
+    return this.customerOtpService.requestOtp(tenantSlug, dto);
+  }
+
+  @Post(':tenantSlug/customers/otp/verify')
+  @ApiOperation({ summary: 'Verify a customer OTP', description: 'Verifies the OTP code and returns a customer access token' })
+  @ApiParam({ name: 'tenantSlug', type: String, description: 'Tenant slug' })
+  @ApiResponse({ status: 201, description: 'OTP verified, token returned' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
+  verifyOtp(
+    @Param('tenantSlug') tenantSlug: string,
+    @Body() dto: VerifyOtpDto,
+  ) {
+    return this.customerOtpService.verifyOtp(tenantSlug, dto.phone, dto.code);
+  }
+
+  @Get(':tenantSlug/customers/me/bookings')
+  @UseGuards(CustomerJwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get my bookings (customer)', description: 'Returns all bookings for the logged-in customer at this tenant' })
+  @ApiParam({ name: 'tenantSlug', type: String, description: 'Tenant slug' })
+  @ApiResponse({ status: 200, description: 'List of bookings' })
+  getMyBookings(
+    @Param('tenantSlug') tenantSlug: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.publicService.getMyBookings(tenantSlug, user.id);
   }
 }

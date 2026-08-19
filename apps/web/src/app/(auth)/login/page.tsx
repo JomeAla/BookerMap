@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff, ArrowLeft, LogIn } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { HoneypotField } from '@/components/honeypot-field'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -68,6 +69,7 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <HoneypotField />
             <div>
               <label className="block text-sm font-medium text-white mb-1.5">Email</label>
               <input

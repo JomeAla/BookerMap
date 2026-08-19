@@ -30,4 +30,12 @@ export class PortalController {
   ) {
     return this.portalService.updateProfile(user.tenantId, user.email, dto);
   }
+
+  @Get('bookings')
+  @ApiOperation({ summary: 'Get customer bookings', description: 'Returns all bookings for the logged-in customer portal user' })
+  @ApiResponse({ status: 200, description: 'List of bookings' })
+  @ApiResponse({ status: 404, description: 'Customer profile not found' })
+  getBookings(@CurrentUser() user: any) {
+    return this.portalService.getBookings(user.tenantId, user.email);
+  }
 }

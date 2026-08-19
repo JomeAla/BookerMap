@@ -115,6 +115,80 @@ export default function BulkSmsPage() {
     },
   })
 
+  // SMS credit purchase flow
+  const [showBuy, setShowBuy] = React.useState(false)
+  const [creditAmount, setCreditAmount] = React.useState(100)
+  const [buyProvider, setBuyProvider] = React.useState<'PAYSTACK' | 'FLUTTERWAVE'>('PAYSTACK')
+
+  const { data: creditTransactions, refetch: refetchCredits } = useQuery({
+    queryKey: ['my-sms-credits'],
+    queryFn: async () => {
+      const { data } = await api.get('/notifications/sms-credits/transactions?limit=20')
+      return data.data as any[]
+    },
+  })
+
+  const pendingPurchase = creditTransactions?.find((t: any) => t.status === 'PENDING' && t.providerRef)
+
+  const buyCredits = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post('/notifications/sms-credits/checkout', {
+        creditAmount,
+        provider: buyProvider,
+      })
+      return data
+    },
+    onSuccess: (res) => {
+      const payload = res.data
+      if (payload.authorizationUrl) {
+        localStorage.setItem('bm_pending_credit_ref', payload.reference)
+        window.location.href = payload.authorizationUrl
+      } else {
+        addToast('Checkout returned no payment link', 'error')
+      }
+    },
+    onError: (err: any) => {
+      addToast(err.response?.data?.message || 'Failed to start credit purchase', 'error')
+    },
+  })
+
+  const verifyCredits = useMutation({
+    mutationFn: async (reference: string) => {
+      const { data } = await api.get(`/notifications/sms-credits/checkout/verify/${reference}?provider=${buyProvider}`)
+      return data
+    },
+    onSuccess: (res) => {
+      const payload = res.data
+      if (payload.status === 'COMPLETED') {
+        addToast(`Payment received — ${payload.balance ?? ''} credits added to your balance`, 'success')
+        localStorage.removeItem('bm_pending_credit_ref')
+        refetchCredits()
+        queryClient.invalidateQueries({ queryKey: ['bulk-sms-campaigns'] })
+      } else if (payload.status === 'PENDING') {
+        addToast('Payment is still being processed. Verify again after completing payment.', 'error')
+      } else {
+        addToast('Payment was not completed. Please try again.', 'error')
+        localStorage.removeItem('bm_pending_credit_ref')
+        refetchCredits()
+      }
+    },
+    onError: (err: any) => {
+      addToast(err.response?.data?.message || 'Failed to verify payment', 'error')
+    },
+  })
+
+  React.useEffect(() => {
+    const ref = localStorage.getItem('bm_pending_credit_ref')
+    if (ref) verifyCredits.mutate(ref)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const totalCredits = creditTransactions?.reduce((sum: number, t: any) => {
+    if (t.status === 'COMPLETED' && t.type === 'PURCHASE') return sum + (t.amount || 0)
+    if (t.status === 'COMPLETED' && t.type === 'GRANT') return sum + (t.amount || 0)
+    return sum
+  }, 0) ?? 0
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
@@ -252,10 +326,19 @@ export default function BulkSmsPage() {
             Create and send SMS campaigns to your customers
           </p>
         </div>
-        <Button size="sm" onClick={() => setShowCreate(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          New Campaign
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-xs text-gray-500 dark:text-gray-400">Credit balance</p>
+            <p className="font-semibold text-gray-900 dark:text-white">{totalCredits.toLocaleString()}</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setShowBuy(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Buy Credits
+          </Button>
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            New Campaign
+          </Button>
+        </div>
       </div>
 
       {(!campaigns || campaigns.length === 0) ? (
@@ -336,6 +419,67 @@ export default function BulkSmsPage() {
             onSubmit={(dto) => createMutation.mutate(dto)}
             loading={createMutation.isPending}
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBuy} onOpenChange={setShowBuy}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Buy SMS Credits</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {pendingPurchase && (
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm">
+                <p className="font-medium text-amber-800 dark:text-amber-300">Pending purchase detected</p>
+                <p className="text-amber-700 dark:text-amber-400 mt-1">
+                  You have an unpaid credit purchase. If you completed payment, verify it below.
+                </p>
+                <Button
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => verifyCredits.mutate(pendingPurchase.providerRef)}
+                  disabled={verifyCredits.isPending}
+                >
+                  {verifyCredits.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                  Verify My Payment
+                </Button>
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">Number of SMS credits</label>
+              <input
+                type="number"
+                value={creditAmount}
+                onChange={(e) => setCreditAmount(parseInt(e.target.value) || 0)}
+                min="1"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">Pay with</label>
+              <div className="flex gap-2">
+                {(['PAYSTACK', 'FLUTTERWAVE'] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setBuyProvider(p)}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                      buyProvider === p ? 'bg-accent text-white' : 'text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    {p.charAt(0) + p.slice(1).toLowerCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setShowBuy(false)}>Cancel</Button>
+              <Button onClick={() => buyCredits.mutate()} disabled={creditAmount <= 0 || buyCredits.isPending}>
+                {buyCredits.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                Continue to Payment
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -38,16 +38,31 @@ export class PaystackWebhookController {
     }
 
     const tenantId = data?.metadata?.tenantId;
-    if (!tenantId) {
+    const reference = data.reference || data.id?.toString();
+
+    // Look up the payment to find the tenant context (handles platform payments too)
+    const payment = await this.prisma.payment.findFirst({
+      where: { providerRef: reference },
+      include: { subscriptionInvoice: true, invoice: true },
+    });
+    const resolvedTenantId = tenantId || payment?.invoice?.tenantId || payment?.subscriptionInvoice?.tenantId;
+
+    if (!resolvedTenantId) {
       this.logger.warn('Webhook received without tenantId in metadata');
       throw new HttpException('Tenant context missing', 400);
     }
 
-    const settings = await this.prisma.paymentSettings.findUnique({
-      where: { tenantId_provider: { tenantId, provider: 'PAYSTACK' } },
-    });
+    let webhookSecret: string | undefined;
+    if (payment?.subscriptionInvoiceId) {
+      const platformSettings = await this.prisma.platformPaymentSettings.findFirst();
+      webhookSecret = platformSettings?.paystackWebhookSecret || process.env.PAYSTACK_WEBHOOK_SECRET;
+    } else {
+      const settings = await this.prisma.paymentSettings.findUnique({
+        where: { tenantId_provider: { tenantId: resolvedTenantId, provider: 'PAYSTACK' } },
+      });
+      webhookSecret = settings?.webhookSecret || process.env.PAYSTACK_WEBHOOK_SECRET;
+    }
 
-    const webhookSecret = settings?.webhookSecret || process.env.PAYSTACK_WEBHOOK_SECRET;
     if (!webhookSecret) {
       this.logger.warn('No webhook secret configured for tenant');
       throw new HttpException('Webhook not configured', 401);
@@ -63,15 +78,13 @@ export class PaystackWebhookController {
       throw new HttpException('Invalid signature', 401);
     }
 
-    const reference = data.reference || data.id?.toString();
-
     switch (event) {
       case 'charge.success': {
-        await this.handleChargeSuccess(data, tenantId, reference);
+        await this.handleChargeSuccess(data, resolvedTenantId, reference);
         break;
       }
       case 'charge.failed': {
-        await this.handleChargeFailed(data, tenantId, reference);
+        await this.handleChargeFailed(data, resolvedTenantId, reference);
         break;
       }
       default: {
@@ -84,7 +97,8 @@ export class PaystackWebhookController {
 
   private async handleChargeSuccess(data: any, tenantId: string, reference: string) {
     const payment = await this.prisma.payment.findFirst({
-      where: { providerRef: reference, invoice: { tenantId } },
+      where: { providerRef: reference },
+      include: { subscriptionInvoice: true },
     });
     if (!payment) {
       this.logger.warn(`Payment not found for reference: ${reference}`);
@@ -92,20 +106,67 @@ export class PaystackWebhookController {
     }
     if (payment.status === 'SUCCESS') return;
 
-    await this.paymentService.handlePaymentSuccess(
-      payment.id,
-      payment.invoiceId,
-      tenantId,
-      data,
-    );
+    // Subscription platform payment (paid to the platform's account)
+    if (payment.subscriptionInvoiceId) {
+      const subTenantId = payment.subscriptionInvoice?.tenantId || tenantId;
+      await this.paymentService.handleSubscriptionPaymentSuccess(
+        payment.id,
+        payment.subscriptionInvoiceId,
+        subTenantId,
+        data,
+      );
+      this.webhookService.dispatchEvent(subTenantId, 'subscription.paid', {
+        paymentId: payment.id,
+        subscriptionInvoiceId: payment.subscriptionInvoiceId,
+        reference,
+      });
+      this.logger.log(`Subscription payment ${reference} completed successfully`);
+      return;
+    }
 
-    this.webhookService.dispatchEvent(tenantId, 'payment.completed', { paymentId: payment.id, invoiceId: payment.invoiceId, reference });
-    this.logger.log(`Payment ${reference} completed successfully`);
+    // SMS credit purchase (paid to the platform's account)
+    const creditTxId = (payment.providerData as any)?.smsCreditTransactionId;
+    if (creditTxId) {
+      const creditTx = await this.prisma.smsCreditTransaction.findUnique({ where: { id: creditTxId } });
+      if (creditTx && creditTx.status !== 'COMPLETED') {
+        const credit = await this.prisma.smsCredit.upsert({
+          where: { tenantId: creditTx.tenantId },
+          create: { tenantId: creditTx.tenantId, balance: creditTx.amount, totalPurchased: creditTx.amount, totalUsed: 0 },
+          update: { balance: { increment: creditTx.amount }, totalPurchased: { increment: creditTx.amount } },
+        });
+        await this.prisma.$transaction([
+          this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'SUCCESS', providerData: data } }),
+          this.prisma.smsCreditTransaction.update({
+            where: { id: creditTx.id },
+            data: { status: 'COMPLETED', providerRef: reference, balanceAfter: credit.balance, creditId: credit.id },
+          }),
+        ]);
+        this.webhookService.dispatchEvent(creditTx.tenantId, 'sms-credits.purchased', { transactionId: creditTx.id, reference });
+        this.logger.log(`SMS credit purchase ${reference} completed successfully`);
+      }
+      return;
+    }
+
+    // Tenant invoice payment
+    if (payment.invoiceId) {
+      await this.paymentService.handlePaymentSuccess(
+        payment.id,
+        payment.invoiceId,
+        tenantId,
+        data,
+      );
+      this.webhookService.dispatchEvent(tenantId, 'payment.completed', { paymentId: payment.id, invoiceId: payment.invoiceId!, reference });
+      this.logger.log(`Payment ${reference} completed successfully`);
+      return;
+    }
+
+    this.logger.warn(`Payment ${reference} has no linked invoice`);
   }
 
   private async handleChargeFailed(data: any, tenantId: string, reference: string) {
     const payment = await this.prisma.payment.findFirst({
-      where: { providerRef: reference, invoice: { tenantId } },
+      where: { providerRef: reference },
+      include: { subscriptionInvoice: true },
     });
     if (!payment) return;
 
@@ -114,7 +175,12 @@ export class PaystackWebhookController {
       data: { status: 'FAILED', providerData: data },
     });
 
-    this.webhookService.dispatchEvent(tenantId, 'payment.failed', { paymentId: payment.id, invoiceId: payment.invoiceId, reference });
+    if (payment.subscriptionInvoiceId) {
+      const subTenantId = payment.subscriptionInvoice?.tenantId || tenantId;
+      this.webhookService.dispatchEvent(subTenantId, 'subscription.payment.failed', { paymentId: payment.id, subscriptionInvoiceId: payment.subscriptionInvoiceId, reference });
+    } else {
+      this.webhookService.dispatchEvent(tenantId, 'payment.failed', { paymentId: payment.id, invoiceId: payment.invoiceId, reference });
+    }
     this.logger.warn(`Payment ${reference} failed: ${data.gateway_response}`);
   }
 }

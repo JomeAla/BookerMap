@@ -8,16 +8,18 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { UserRole } from '@prisma/client';
 import { SubscriptionService } from './subscription.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 import { CancelSubscriptionDto } from './dto/cancel-subscription.dto';
+import { CheckoutSubscriptionDto } from './dto/checkout-subscription.dto';
 
 @ApiTags('Subscriptions')
 @Controller('subscriptions')
@@ -66,10 +68,37 @@ export class SubscriptionController {
   @Patch('my/plan')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update my plan', description: 'Upgrade or downgrade the current tenant subscription plan' })
+  @ApiOperation({ summary: 'Update my plan', description: 'Upgrade or downgrade the current tenant subscription plan (activates immediately)' })
   @ApiResponse({ status: 200, description: 'Plan updated' })
   async updateMyPlan(@CurrentUser() user: any, @Body() dto: UpdatePlanDto) {
     return this.subscriptionService.updatePlan(user.tenantId, dto.plan, dto.billingCycle);
+  }
+
+  @Post('my/checkout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Checkout a subscription plan', description: 'Initialize payment for upgrading to a paid plan' })
+  @ApiResponse({ status: 200, description: 'Checkout initialized' })
+  async checkoutMyPlan(@CurrentUser() user: any, @Body() dto: CheckoutSubscriptionDto) {
+    return this.subscriptionService.checkout(user.tenantId, dto);
+  }
+
+  @Get('my/checkout/verify/:reference')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Verify subscription checkout payment', description: 'Verify payment for a subscription checkout' })
+  @ApiParam({ name: 'reference', type: String, description: 'Payment provider reference' })
+  @ApiResponse({ status: 200, description: 'Verification result' })
+  async verifyCheckout(
+    @Param('reference') reference: string,
+    @CurrentUser() user: any,
+    @Query('provider') provider?: string,
+  ) {
+    return this.subscriptionService.verifyCheckout(
+      reference,
+      user.tenantId,
+      (provider as any) || undefined,
+    );
   }
 
   @Post('my/cancel')

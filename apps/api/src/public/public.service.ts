@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { generateBookingReference } from '../common/utils/booking-reference';
 import { PublicCreateBookingDto } from './dto/public-create-booking.dto';
 
 @Injectable()
@@ -28,6 +29,14 @@ export class PublicService {
     });
     if (!tenant) throw new NotFoundException('Tenant not found');
     return tenant;
+  }
+
+  async listTenants() {
+    return this.prisma.tenant.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, slug: true, logo: true, primaryColor: true, timezone: true, currency: true },
+      orderBy: { name: 'asc' },
+    });
   }
 
   async getTenantById(id: string) {
@@ -120,6 +129,40 @@ export class PublicService {
     return this.createBookingInternal(tenant.id, dto);
   }
 
+  async getBookingByReference(tenantSlug: string, reference: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { slug: tenantSlug } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const booking = await this.prisma.booking.findFirst({
+      where: { tenantId: tenant.id, reference },
+      include: {
+        customer: { select: { firstName: true, lastName: true, email: true, phone: true } },
+        service: true,
+        location: true,
+        technician: { select: { firstName: true, lastName: true } },
+        invoices: true,
+      },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    return booking;
+  }
+
+  async getMyBookings(tenantSlug: string, customerId: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { slug: tenantSlug } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    return this.prisma.booking.findMany({
+      where: { tenantId: tenant.id, customerId },
+      include: {
+        service: true,
+        location: true,
+        technician: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { startTime: 'desc' },
+    });
+  }
+
   private async createBookingInternal(tenantId: string, dto: PublicCreateBookingDto) {
     const service = await this.prisma.service.findFirst({
       where: { id: dto.serviceId, tenantId, isActive: true },
@@ -167,6 +210,7 @@ export class PublicService {
         notes: dto.notes,
         totalPrice: service.price,
         status: 'PENDING',
+        reference: generateBookingReference(),
       },
       include: {
         customer: true,

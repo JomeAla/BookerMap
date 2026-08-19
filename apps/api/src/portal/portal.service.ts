@@ -36,4 +36,21 @@ export class PortalService {
 
     return updated;
   }
+
+  async getBookings(tenantId: string, email: string) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { tenantId, email },
+      select: { id: true },
+    });
+
+    if (!customer) {
+      throw new NotFoundException('Customer profile not found');
+    }
+
+    return this.prisma.booking.findMany({
+      where: { tenantId, customerId: customer.id },
+      include: { service: true, location: true, technician: true, invoices: true, reviews: true },
+      orderBy: { startTime: 'desc' },
+    });
+  }
 }
