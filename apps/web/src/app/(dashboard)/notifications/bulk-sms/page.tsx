@@ -124,7 +124,7 @@ export default function BulkSmsPage() {
     queryKey: ['my-sms-credits'],
     queryFn: async () => {
       const { data } = await api.get('/notifications/sms-credits/transactions?limit=20')
-      return data.data as any[]
+      return (data.data?.data as any[]) ?? []
     },
   })
 
